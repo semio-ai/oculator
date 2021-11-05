@@ -1,6 +1,6 @@
 # oculator
 
-An implementation of attention generation.
+An implementation of oculesic behavior (visual attention) generation.
 
 ## Dependencies
   * OpenCV 4
