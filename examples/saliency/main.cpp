@@ -8,6 +8,11 @@
 #include <variant>
 #include <optional>
 
+#include "oculator/model/MR-AIM/AIM.h"
+#include "oculator/model/MR-AIM/RunMR_AIM.h"
+
+class AIM;
+
 int main(int argc, char *argv[])
 {
   using namespace oculator::model::saliency;
@@ -60,8 +65,8 @@ int main(int argc, char *argv[])
   if (result.count("resolution_y")) resolution_y = result["resolution_y"].as<std::uint32_t>();
   
   // Create saliency model
-  Parameters parameters;
-  Model model(parameters);
+  //Parameters parameters;
+  //Model model(parameters);
 
 
   // Create the cv::VideoCapture with either a device ID or URI
@@ -79,16 +84,26 @@ int main(int argc, char *argv[])
   if (resolution_y) cap->set(cv::CAP_PROP_FRAME_HEIGHT, *resolution_y);
   
 
+  cv::Mat Basis;
   cv::Mat frame;
-  while (cv::waitKey(1) < 0)
+  cv::Mat saliency;
+
+  std::string basis_file_name = "data/basis.yml";
+  AIM mkAIM(basis_file_name, 19);
+	Basis = mkAIM.LoadBasis(basis_file_name);
+  int num_pyramid_levels = 0;
+  //while (cv::waitKey(1) < 0)
+  for(int i = 0;i < 15;i++)
   {
     *cap >> frame;
 
     if (frame.empty()) break;
     
-    cv::imshow("frame", frame);
-    cv::Mat saliency = model(frame);
-    cv::imshow("saliency", saliency);
+    //cv::imshow("frame", frame);
+    saliency = RunMR_AIM(frame, Basis, mkAIM, num_pyramid_levels);
+
+    //cv::Mat saliency = model(frame);
+    //cv::imshow("saliency", saliency);
   }
 
   return EXIT_SUCCESS;
