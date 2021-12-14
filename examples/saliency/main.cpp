@@ -1,18 +1,27 @@
-#include <oculator/model/saliency.hpp>
+//#include <oculator/model/saliency.hpp>
 
 #include <cstdlib>
-#include <opencv2/highgui.hpp>
-#include <opencv2/videoio.hpp>
+//#include <opencv2/highgui.hpp>
+//#include <opencv2/videoio.hpp>
 
 #include <cxxopts.hpp>
 #include <variant>
 #include <optional>
 
-#include "oculator/model/MR-AIM/AIM.h"
-#include "oculator/model/MR-AIM/RunMR_AIM.h"
+//#include "oculator/model/MR-AIM/AIM.h"
+//#include "oculator/model/MR-AIM/RunMR_AIM.h"
 
-class AIM;
+//class AIM;
 
+
+#include <torch/torch.h>
+#include <iostream>
+
+int main() {
+  torch::Tensor tensor = torch::rand({2, 3});
+  std::cout << tensor << std::endl;
+}
+/**
 int main(int argc, char *argv[])
 {
   using namespace oculator::model::saliency;
@@ -108,3 +117,4 @@ int main(int argc, char *argv[])
 
   return EXIT_SUCCESS;
 }
+**/
