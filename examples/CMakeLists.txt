@@ -1,1 +1,2 @@
+add_subdirectory(qoculator)
 add_subdirectory(saliency)
