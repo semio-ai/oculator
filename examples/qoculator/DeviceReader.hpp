@@ -3,11 +3,11 @@
 
 #include <QtCore/QObject>
 #include <QtWidgets/QLabel>
-#include <opencv2/videoio.hpp>
-#include <opencv2/imgproc.hpp>
+//#include <opencv2/videoio.hpp>
+//#include <opencv2/imgproc.hpp>
 #include "ImageView.hpp"
 
-#include "oculator/model/MR-AIM/RunMR_AIM.h"
+//#include "oculator/model/MR-AIM/RunMR_AIM.h"
 
 
 namespace qoculator
@@ -17,6 +17,8 @@ namespace qoculator
     Q_OBJECT
   public:
     DeviceReader(ImageView *const target, ImageView *const saliency, QObject *const parent = nullptr);
+    ~DeviceReader();
+
     void update();
 
 
@@ -24,11 +26,11 @@ namespace qoculator
   private:
     ImageView *target_;
     ImageView *saliency_;
-    cv::VideoCapture capture_;
+    //cv::VideoCapture capture_;
 
-    cv::Mat basis_;
+    //cv::Mat basis_;
 
-    std::unique_ptr<AIM> mk_aim_;
+    //std::unique_ptr<AIM> mk_aim_;
     
   };
 }

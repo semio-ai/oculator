@@ -2,7 +2,8 @@
 #define _QOCULATOR_IMAGE_VIEW_HPP_
 
 #include <QtWidgets/QLabel>
-#include <opencv2/core.hpp>
+//#include <torch/torch.h>
+//#include <opencv2/core.hpp>
 
 namespace qoculator
 {
@@ -13,7 +14,7 @@ namespace qoculator
     ImageView(QWidget *parent = nullptr);
     ~ImageView();
 
-    void setMat(const cv::Mat &mat);
+    //void setTensor(const torch::Tensor &mat);
   };
 }
 

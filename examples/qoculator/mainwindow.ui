@@ -22,7 +22,7 @@
       </property>
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <widget class="qoculator::ImageView" name="raw">
+        <widget class="QLabel" name="raw">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
            <horstretch>0</horstretch>
@@ -50,7 +50,7 @@
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="qoculator::ImageView" name="saliency">
+        <widget class="QLabel" name="saliency">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
            <horstretch>0</horstretch>
@@ -95,7 +95,7 @@
   <customwidget>
    <class>qoculator::ImageView</class>
    <extends>QLabel</extends>
-   <header>ImageView.hpp</header>
+   <header></header>
   </customwidget>
  </customwidgets>
  <resources/>

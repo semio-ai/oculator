@@ -2,7 +2,6 @@
 
 #include <QtCore/QDebug>
 
-
 using namespace qoculator;
 
 DeviceReader::DeviceReader(ImageView *const target, ImageView *const saliency, QObject *const parent)
@@ -10,17 +9,27 @@ DeviceReader::DeviceReader(ImageView *const target, ImageView *const saliency, Q
   , target_(target)
   , saliency_(saliency)
 {
-  capture_.open(0);
-  capture_.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-  capture_.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+  //  vlcPlayer = NULL;
 
-  mk_aim_ = std::make_unique<AIM>("data/basis.yml", 19);
-  basis_ = mk_aim_->LoadBasis("data/basis.yml");
+  /* Initialize libVLC */
+  //vlcInstance = libvlc_new(0, NULL);
+
+  /* Complain in case of broken installation */
+  //if (vlcInstance == NULL) {
+  //  QMessageBox::critical(this, "Qt libVLC player", "Could not init libVLC");
+  //  exit(1);
+  //}
+}
+
+DeviceReader::~DeviceReader() {
+  /* Release libVLC instance on quit */
+  //if (vlcInstance)
+  //  libvlc_release(vlcInstance);
 }
 
 void DeviceReader::update()
 {
-  if (!capture_.grab())
+  /*if (!capture_.grab())
   {
     qWarning() << "Failed to grab frame";
     return;
@@ -36,5 +45,6 @@ void DeviceReader::update()
   target_->setMat(frame);
 
   saliency_->setMat(RunMR_AIM(frame, basis_, *mk_aim_, 0));
-
+  */
 }
+
