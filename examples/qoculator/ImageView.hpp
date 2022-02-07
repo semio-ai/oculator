@@ -2,11 +2,13 @@
 #define _QOCULATOR_IMAGE_VIEW_HPP_
 
 #include <QtWidgets/QLabel>
-//#include <torch/torch.h>
-//#include <opencv2/core.hpp>
+#include <torch/torch.h>
 
 namespace qoculator
 {
+  typedef enum {
+    VIZ_RGB, VIZ_HEATMAP
+  } VizMode;
   class ImageView : public QLabel
   {
     Q_OBJECT
@@ -14,7 +16,7 @@ namespace qoculator
     ImageView(QWidget *parent = nullptr);
     ~ImageView();
 
-    //void setTensor(const torch::Tensor &mat);
+    void setTensor(const torch::Tensor &tensor, VizMode mode);
   };
 }
 
