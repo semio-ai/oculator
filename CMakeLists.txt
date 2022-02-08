@@ -30,17 +30,24 @@ find_package(Torch REQUIRED)
 pkg_check_modules(IL2 REQUIRED IMPORTED_TARGET IL)
 pkg_check_modules(ILU2 REQUIRED IMPORTED_TARGET ILU)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${IL2_CXX_FLAGS}")
 
-file (GLOB_RECURSE SOURCES src/*.cpp)
+if (BUILD_VIZ)
+  file (GLOB_RECURSE SOURCES src/*.cpp)
+  set (VIZ_CXX_FLAGS "-DVIZ=1")
+else 
+  set (VIZ_CXX_FLAGS "-DVIZ=0")
+  file (GLOB_RECURSE SOURCES src/oculator/*.cpp)
+  file (SOURCES src/main.cpp)
+endif () 
 
-add_library(oculator SHARED ${SOURCES})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${IL2_CXX_FLAGS} ${VIZ_CXX_FLAGS}")
+# add_library(oculator SHARED ${SOURCES})
+add_executable(oculator main.cpp ${SOURCES})
+# target_link_libraries(oculator PUBLIC ${OpenCV_LIBS} ${TORCH_LIBRARIES} PkgConfig::IL2 PkgConfig::ILU2)
 
-target_link_libraries(oculator PUBLIC ${OpenCV_LIBS} ${TORCH_LIBRARIES} PkgConfig::IL2 PkgConfig::ILU2)
+# add_subdirectory(third_party)
 
-add_subdirectory(third_party)
-
-if (BUILD_EXAMPLES)
-   include_directories("include/")
-  add_subdirectory(examples)
-endif()
+# if (BUILD_EXAMPLES)
+#    include_directories("include/")
+#   add_subdirectory(examples)
+# endif()
