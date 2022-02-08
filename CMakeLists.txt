@@ -1,11 +1,8 @@
 cmake_minimum_required(VERSION 3.6)
 project(oculator)
 
-#set(CMAKE_OSX_ARCHITECTURES "x86_64")
-
-
 ## Hacking the cmake paths for now. Need to figure out what to do about this later. 
-set(CMAKE_PREFIX_PATH "/opt/homebrew/Caskroom/miniforge/base/envs/torch/lib/python3.9/site-packages/torch/share/cmake;/opt/homebrew/Cellar/qt@5/5.15.2_1/lib/cmake;/opt/homebrew/Cellar/devil/1.8.0_2/lib/pkgconfig")
+set(CMAKE_PREFIX_PATH "/opt/homebrew/Caskroom/miniforge/base/envs/torch/lib/python3.9/site-packages/torch/share/cmake;/opt/homebrew/Cellar/qt@5/5.15.2_1/lib/cmake;/opt/homebrew/Cellar/devil/1.8.0_2/lib/pkgconfig;./third_party/")
 
 
 include(FindPkgConfig REQUIRED)
@@ -28,6 +25,7 @@ endif ()
 
 find_package(PkgConfig REQUIRED)
 find_package(Torch REQUIRED)
+# find_package(cxxopts REQUIRED)
 
 pkg_check_modules(IL2 REQUIRED IMPORTED_TARGET IL)
 pkg_check_modules(ILU2 REQUIRED IMPORTED_TARGET ILU)

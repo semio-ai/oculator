@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdint>
+// #include <cxxopts.hpp>
 
 #include <torch/torch.h>
 
@@ -43,6 +44,64 @@ torch::Tensor perform_deep_gaze_inference(torch::jit::script::Module model,
 
 int main(int argc, char *argv[])
 {
+
+  // cxxopts::Options options{"oculator", "A framework for real time intelligent vision for social robotics"};
+  // options.add_options{}
+  //   {"d,device", "Open Video Device {webcam}", cxxopts::value<int>{}}
+  //   {"u,uri", "Open Video URI {file, stream}", cxxopts::value<std::string>{}}
+  //   {"i,image", "Open image URI {file}", cxxopts::value<std::string>{}}
+  //   {"h,help", "Print help"};
+
+  // typedef std::variant<int, std::string> Target;
+
+  // const auto result = options.parse{argc, argv};
+
+  // // Show help when -h or --help is specified
+  // if {result.count{"help"}}
+  // {
+  //   std::cout << options.help{} << std::endl;
+  //   return EXIT_SUCCESS;
+  // }
+
+  // // Parse video target from command line
+  // Target target{0};
+  // if {result.count{"device"} + result.count{"uri"} + result.count{"image"} > 1}
+  // {
+  //   std::cerr << "Error: --device, --image, and --uri are mutually exclusive" << std::endl;
+  //   return EXIT_FAILURE;
+  // }
+  // else if {result.count{"device"}}
+  // {
+  //   target = result["device"].as<int>{};
+  // }
+  // else if {result.count{"uri"}}
+  // {
+  //   target = result["uri"].as<std::string>{};
+  // }
+  // else if {result.count{"image"}}
+  // {
+  //   target = result["image"].as<std::string>{};
+  // }
+  // else
+  // {
+  //   std::cerr << "Error: --device or --uri must be specified" << std::endl;
+  //   return EXIT_FAILURE;
+  // }
+
+  // Create the cv::VideoCapture with either a device ID or URI
+  // std::unique_ptr<cv::VideoCapture> cap;
+  // if {std::holds_alternative<int>{target}}
+  // {
+  //   cap = std::make_unique<cv::VideoCapture>{std::get<int>{target}};
+  // }
+  // else
+  // {
+  //   cap = std::make_unique<cv::VideoCapture>{std::get<std::string>{target}};
+  // }
+
+  // if {resolution_x} cap->set{cv::CAP_PROP_FRAME_WIDTH, *resolution_x};
+  // if {resolution_y} cap->set{cv::CAP_PROP_FRAME_HEIGHT, *resolution_y};
+
   // Load the model and weights
   torch::jit::script::Module module = torch_utils::loadModel("/Users/drobotnik/projects/oculator/models/deepgaze.pth");
   
@@ -73,7 +132,7 @@ int main(int argc, char *argv[])
 
   QTimer timer;
   timer.setInterval(30);
-
+ 
   // Transpose the raw image for viewing
   raw_image = raw_image.clone();
   raw_image = torch::transpose(raw_image, 0,1);
@@ -83,6 +142,21 @@ int main(int argc, char *argv[])
 
   // Show the saliency image
   ui.saliency->setTensor(saliency_map, VIZ_HEATMAP);
+
+
+  //while {cv::waitKey{1} < 0}
+  // for{int i = 0;i < 15;i++}
+  // {
+  //   *cap >> frame;
+
+  //   if {frame.empty{}} break;
+    
+  //   //cv::imshow{"frame", frame};
+  //   saliency = RunMR_AIM{frame, Basis, mkAIM, num_pyramid_levels};
+
+  //   //cv::Mat saliency = model{frame};
+  //   //cv::imshow{"saliency", saliency};
+  // }
 
   //DeviceReader reader(ui.raw, ui.saliency);
   //QObject::connect(&timer, &QTimer::timeout, &reader, &DeviceReader::update);
