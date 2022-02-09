@@ -1,8 +1,8 @@
-#include "DeviceReader.hpp"
+#include "oculator/viz/DeviceReader.hpp"
 
 #include <QtCore/QDebug>
 
-using namespace qoculator;
+using namespace oculator;
 
 DeviceReader::DeviceReader(ImageView *const target, ImageView *const saliency, QObject *const parent)
   : QObject(parent)

@@ -4,14 +4,16 @@
 #include <QtWidgets/QLabel>
 #include <torch/torch.h>
 
-namespace qoculator
+namespace oculator
 {
   typedef enum {
     VIZ_RGB, VIZ_HEATMAP
   } VizMode;
+
   class ImageView : public QLabel
   {
     Q_OBJECT
+    
   public:
     ImageView(QWidget *parent = nullptr);
     ~ImageView();

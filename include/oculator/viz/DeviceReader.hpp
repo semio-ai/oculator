@@ -1,20 +1,16 @@
-#ifndef _QOCULATOR_DEVICE_READER_HPP_
-#define _QOCULATOR_DEVICE_READER_HPP_
+#ifndef _OCULATOR_DEVICE_READER_HPP_
+#define _OCULATOR_DEVICE_READER_HPP_
 
 #include <QtCore/QObject>
 #include <QtWidgets/QLabel>
-//#include <opencv2/videoio.hpp>
-//#include <opencv2/imgproc.hpp>
 #include "ImageView.hpp"
 
-//#include "oculator/model/MR-AIM/RunMR_AIM.h"
-
-
-namespace qoculator
+namespace oculator
 {
   struct DeviceReader : public QObject
   {
     Q_OBJECT
+    
   public:
     DeviceReader(ImageView *const target, ImageView *const saliency, QObject *const parent = nullptr);
     ~DeviceReader();

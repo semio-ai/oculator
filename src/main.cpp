@@ -4,15 +4,20 @@
 
 #include <torch/torch.h>
 
+#if (VIZ == 1)
 #include <QtWidgets/QApplication>
 #include <QtCore/QTimer>
+#include "viz/ui_mainwindow.h"
+#include "oculator/viz/DeviceReader.hpp"
 
-#include "ui_mainwindow.h"
-#include "DeviceReader.hpp"
+#endif
+
 #include "oculator/utils/image_utils.h"
 #include "oculator/utils/torch_utils.h"
 
-using namespace qoculator;
+#if (VIZ == 1)
+using namespace oculator;
+#endif
 
 torch::Tensor perform_deep_gaze_inference(torch::jit::script::Module model, 
                                           torch::Tensor inference_img, 
@@ -120,6 +125,7 @@ int main(int argc, char *argv[])
   // Perform the inference
   torch::Tensor saliency_map = perform_deep_gaze_inference(module, inference_img, centerbias);
 
+#if (VIZ == 1)
   // Construct the GUI 
   QApplication app(argc, argv);
 
@@ -132,16 +138,19 @@ int main(int argc, char *argv[])
 
   QTimer timer;
   timer.setInterval(30);
+#endif
  
   // Transpose the raw image for viewing
   raw_image = raw_image.clone();
   raw_image = torch::transpose(raw_image, 0,1);
 
+#if (VIZ == 1)
   // Show the raw image
   ui.raw->setTensor(raw_image, VIZ_RGB);
 
   // Show the saliency image
   ui.saliency->setTensor(saliency_map, VIZ_HEATMAP);
+#endif
 
 
   //while {cv::waitKey{1} < 0}
@@ -161,6 +170,8 @@ int main(int argc, char *argv[])
   //DeviceReader reader(ui.raw, ui.saliency);
   //QObject::connect(&timer, &QTimer::timeout, &reader, &DeviceReader::update);
   //timer.start();
-  
+#if (VIZ == 1)
   return app.exec();
+#endif
+  return 0;
 }

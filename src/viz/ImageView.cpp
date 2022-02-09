@@ -1,17 +1,7 @@
-#include "ImageView.hpp"
+#include "oculator/viz/ImageView.hpp"
 
-qoculator::ImageView::ImageView(QWidget *parent)
-  : QLabel(parent)
-{
-  setAlignment(Qt::AlignCenter);
-  setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-}
 
-qoculator::ImageView::~ImageView()
-{
-}
-
-namespace qoculator {
+namespace oculator {
   // Instead of generating this, we're just using what was in matplotlib.
   static const float __HOT_COLORMAP__[][4] = 
       {{0.0416, 0.0, 0.0, 1.0},
@@ -271,6 +261,13 @@ namespace qoculator {
       {1.0, 1.0, 0.9845588080882198, 1.0},
       {1.0, 1.0, 1.0, 1.0}};
 
+  ImageView::ImageView(QWidget *parent) : QLabel(parent) {
+    setAlignment(Qt::AlignCenter);
+    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+  }
+
+  ImageView::~ImageView() {
+  }
   /**
    * Gets the hot colormap to be used for visualizing grayscale images.
    */
@@ -284,57 +281,57 @@ namespace qoculator {
       }
       return colorTable;
   }
-}
-void qoculator::ImageView::setTensor(const torch::Tensor &tensor, VizMode mode) {
-  int width, height;
-  unsigned char* img_data;
+  void ImageView::setTensor(const torch::Tensor &tensor, VizMode mode) {
+    int width, height;
+    unsigned char* img_data;
 
-  switch(mode) {
-    case VIZ_RGB:
-      // Get the data from the torch tensor
-      width = tensor.size(0);
-      height = tensor.size(1);
-      img_data = tensor.data_ptr<unsigned char>();
+    switch(mode) {
+      case VIZ_RGB:
+        // Get the data from the torch tensor
+        width = tensor.size(0);
+        height = tensor.size(1);
+        img_data = tensor.data_ptr<unsigned char>();
+  #ifdef _DEBUG
+        std::cout << "Width: " << width << "; Height: " << height << "; data: " << reinterpret_cast<std::uintptr_t>(img_data) << std::endl;
+  #endif
+        {
+          QImage image(img_data, width, height, sizeof(unsigned char)*3*width, QImage::Format_RGB888);
+          setPixmap(QPixmap::fromImage(image).scaled(size(), Qt::KeepAspectRatio));
 #ifdef _DEBUG
-      std::cout << "Width: " << width << "; Height: " << height << "; data: " << reinterpret_cast<std::uintptr_t>(img_data) << std::endl;
+          image.save("/Users/drobotnik/blah.jpg");
 #endif
-      {
-        QImage image(img_data, width, height, sizeof(unsigned char)*3*width, QImage::Format_RGB888);
-        setPixmap(QPixmap::fromImage(image).scaled(size(), Qt::KeepAspectRatio));
-#ifdef _DEBUG
-        image.save("/Users/drobotnik/blah.jpg");
-#endif
-      }
-      break;
+        }
+        break;
 
-    case VIZ_HEATMAP:
-      width = tensor.size(0);
-      height = tensor.size(1);
-      img_data = tensor.data_ptr<unsigned char>();
+      case VIZ_HEATMAP:
+        width = tensor.size(0);
+        height = tensor.size(1);
+        img_data = tensor.data_ptr<unsigned char>();
 #ifdef _DEBUG
-      std::cout << "Width: " << width << "; Height: " << height << "; data: " << reinterpret_cast<std::uintptr_t>(src_data) << std::endl;
+        std::cout << "Width: " << width << "; Height: " << height << "; data: " << reinterpret_cast<std::uintptr_t>(src_data) << std::endl;
 #endif
-      {   
-        // Extract it to a Qt data structure
-        QImage greyscale(img_data, width, height, sizeof(unsigned char)*width, QImage::Format_Grayscale8);
+        {   
+          // Extract it to a Qt data structure
+          QImage greyscale(img_data, width, height, sizeof(unsigned char)*width, QImage::Format_Grayscale8);
 
-        // Rotate it to fit
-        QTransform myTransform;
-        myTransform.rotate(90);
-        greyscale = greyscale.transformed(myTransform).mirrored(true, false);
+          // Rotate it to fit
+          QTransform myTransform;
+          myTransform.rotate(90);
+          greyscale = greyscale.transformed(myTransform).mirrored(true, false);
 
 #ifdef _DEBUG
-        rotated.save("/Users/drobotnik/blah2.jpg");
+          rotated.save("/Users/drobotnik/blah2.jpg");
 #endif
-        // apply the heatmap
-        QImage indexed_image = greyscale.convertToFormat(QImage::Format_Indexed8);
-        indexed_image.setColorTable(getHotColorMap());
-        indexed_image = indexed_image.convertToFormat(QImage::Format_RGB30);
+          // apply the heatmap
+          QImage indexed_image = greyscale.convertToFormat(QImage::Format_Indexed8);
+          indexed_image.setColorTable(getHotColorMap());
+          indexed_image = indexed_image.convertToFormat(QImage::Format_RGB30);
 
-        // Finally display it.
-        setPixmap(QPixmap::fromImage(indexed_image).scaled(size(), Qt::KeepAspectRatio));
-        
-      }
-      break;
+          // Finally display it.
+          setPixmap(QPixmap::fromImage(indexed_image).scaled(size(), Qt::KeepAspectRatio));
+          
+        }
+        break;
+    }
   }
 }
