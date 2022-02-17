@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdint>
-// #include <cxxopts.hpp>
+#include <cxxopts.hpp>
+#include <variant>
 
 #include <torch/torch.h>
 
@@ -50,48 +51,52 @@ torch::Tensor perform_deep_gaze_inference(torch::jit::script::Module model,
 int main(int argc, char *argv[])
 {
 
-  // cxxopts::Options options{"oculator", "A framework for real time intelligent vision for social robotics"};
-  // options.add_options{}
-  //   {"d,device", "Open Video Device {webcam}", cxxopts::value<int>{}}
-  //   {"u,uri", "Open Video URI {file, stream}", cxxopts::value<std::string>{}}
-  //   {"i,image", "Open image URI {file}", cxxopts::value<std::string>{}}
-  //   {"h,help", "Print help"};
+  cxxopts::Options options{"oculator", "A framework for real time intelligent vision for social robotics"};
+  options.add_options()
+    ("d,device", "Open Video Device {webcam}", cxxopts::value<int>())
+    ("u,uri", "Open Video URI {file, stream}", cxxopts::value<std::string>())
+    ("i,image", "Open image URI {file}", cxxopts::value<std::string>())
+    ("h,help", "Print help");
 
-  // typedef std::variant<int, std::string> Target;
+  typedef std::variant<int, std::string> Target;
 
-  // const auto result = options.parse{argc, argv};
+  const auto result = options.parse(argc, argv);
 
-  // // Show help when -h or --help is specified
-  // if {result.count{"help"}}
-  // {
-  //   std::cout << options.help{} << std::endl;
-  //   return EXIT_SUCCESS;
-  // }
+  // Show help when -h or --help is specified
+  if (result.count("help"))
+  {
+    std::cout << options.help() << std::endl;
+    return EXIT_SUCCESS;
+  }
 
-  // // Parse video target from command line
-  // Target target{0};
-  // if {result.count{"device"} + result.count{"uri"} + result.count{"image"} > 1}
-  // {
-  //   std::cerr << "Error: --device, --image, and --uri are mutually exclusive" << std::endl;
-  //   return EXIT_FAILURE;
-  // }
-  // else if {result.count{"device"}}
-  // {
-  //   target = result["device"].as<int>{};
-  // }
-  // else if {result.count{"uri"}}
-  // {
-  //   target = result["uri"].as<std::string>{};
-  // }
-  // else if {result.count{"image"}}
-  // {
-  //   target = result["image"].as<std::string>{};
-  // }
-  // else
-  // {
-  //   std::cerr << "Error: --device or --uri must be specified" << std::endl;
-  //   return EXIT_FAILURE;
-  // }
+  // Parse video target from command line
+  Target target(0);
+  std::string filename;
+  if (result.count("device") + result.count("uri") + result.count("image") > 1)
+  {
+    std::cerr << "Error: --device, --image, and --uri are mutually exclusive" << std::endl;
+    return EXIT_FAILURE;
+  }
+  else if (result.count("device"))
+  {
+    target = result["device"].as<int>();
+  }
+  else if (result.count("uri"))
+  {
+    target = result["uri"].as<std::string>();
+  }
+  else if (result.count("image"))
+  {
+    target = result["image"].as<std::string>();
+    filename = std::get<std::string>(target);
+    std::cout << "Opening image target " << filename << std::endl;
+    
+  }
+  else
+  {
+    std::cerr << "Error: --device or --uri must be specified" << std::endl;
+    return EXIT_FAILURE;
+  }
 
   // Create the cv::VideoCapture with either a device ID or URI
   // std::unique_ptr<cv::VideoCapture> cap;
@@ -111,7 +116,7 @@ int main(int argc, char *argv[])
   torch::jit::script::Module module = torch_utils::loadModel("/Users/drobotnik/projects/oculator/models/deepgaze.pth");
   
   // Load the raw image to process
-  torch::Tensor raw_image = image_utils::loadFile("/Users/drobotnik/test.jpg");
+  torch::Tensor raw_image = image_utils::loadFile(filename.c_str());
   raw_image = raw_image.slice(1, 0,768).slice(0,0,1024);
   
   // Load the bias input (it's a constant for DeepGaze)

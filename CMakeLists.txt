@@ -78,6 +78,8 @@ endif ()
 include_directories("include/")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${IL2_CXX_FLAGS} ${VIZ_CXX_FLAGS}")
 
+include_directories("third_party/cxxopts")
+
 if (BUILD_VIZ)
   file(GLOB HEADERS_TO_MOC include/oculator/viz/*.hpp)
   qt5_wrap_cpp(PROCESSED_MOCS                                                                                                                                                                                                                                                                    
@@ -91,10 +93,3 @@ else ()
   add_executable(oculator src/main.cpp ${SOURCES})
   target_link_libraries(oculator PUBLIC ${TORCH_LIBRARIES} PkgConfig::IL PkgConfig::ILU)
 endif ()
-# target_link_libraries(qoculator oculator Qt5::Core Qt5::Widgets)
-# add_subdirectory(third_party)
-
-# if (BUILD_EXAMPLES)
-#    include_directories("include/")
-#   add_subdirectory(examples)
-# endif()
