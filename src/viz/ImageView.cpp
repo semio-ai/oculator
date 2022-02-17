@@ -1,6 +1,5 @@
 #include "oculator/viz/ImageView.hpp"
 
-
 namespace oculator {
   // Instead of generating this, we're just using what was in matplotlib.
   static const float __HOT_COLORMAP__[][4] = 
@@ -291,9 +290,9 @@ namespace oculator {
         width = tensor.size(0);
         height = tensor.size(1);
         img_data = tensor.data_ptr<unsigned char>();
-  #ifdef _DEBUG
+#ifdef _DEBUG
         std::cout << "Width: " << width << "; Height: " << height << "; data: " << reinterpret_cast<std::uintptr_t>(img_data) << std::endl;
-  #endif
+#endif
         {
           QImage image(img_data, width, height, sizeof(unsigned char)*3*width, QImage::Format_RGB888);
           setPixmap(QPixmap::fromImage(image).scaled(size(), Qt::KeepAspectRatio));
