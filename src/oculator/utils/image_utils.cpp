@@ -4,8 +4,6 @@
 #include <exception>
 
 namespace image_utils {
-    
-
     // Tracking whether OpenIL is already loaded
     static bool __IL_LOADED__ = false;
     /**

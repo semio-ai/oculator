@@ -1,8 +1,8 @@
-#ifndef _OCULATOR_DEVICE_READER_HPP_
-#define _OCULATOR_DEVICE_READER_HPP_
+#pragma once
 
 #include <QtCore/QObject>
 #include <QtWidgets/QLabel>
+
 #include "ImageView.hpp"
 
 namespace oculator
@@ -21,14 +21,6 @@ namespace oculator
 
   private:
     ImageView *target_;
-    ImageView *saliency_;
-    //cv::VideoCapture capture_;
-
-    //cv::Mat basis_;
-
-    //std::unique_ptr<AIM> mk_aim_;
-    
+    ImageView *saliency_;    
   };
 }
-
-#endif

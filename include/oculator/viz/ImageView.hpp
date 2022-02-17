@@ -1,5 +1,4 @@
-#ifndef _QOCULATOR_IMAGE_VIEW_HPP_
-#define _QOCULATOR_IMAGE_VIEW_HPP_
+#pragma once
 
 #include <QtWidgets/QLabel>
 #include <torch/torch.h>
@@ -22,4 +21,3 @@ namespace oculator
   };
 }
 
-#endif
