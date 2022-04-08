@@ -1,26 +1,28 @@
 #pragma once
 
-#include <QtCore/QObject>
-#include <QtWidgets/QLabel>
-
-#include "ImageView.hpp"
+#include <vlc/vlc.h>
+#include <mutex>
+#include <functional>
 
 namespace oculator
 {
-  struct DeviceReader : public QObject
+  class DeviceReader
   {
-    Q_OBJECT
-    
   public:
-    DeviceReader(ImageView *const target, ImageView *const saliency, QObject *const parent = nullptr);
+    DeviceReader(std::string uri);
     ~DeviceReader();
-
-    void update();
-
-
-
+    
+    bool is_playing();
   private:
-    ImageView *target_;
-    ImageView *saliency_;    
+    libvlc_instance_t *m_vlc_instance;
+    libvlc_media_player_t *m_vlc_player;
+    bool m_is_initialized;
+    std::mutex mutex;
+
+    bool initializeVLC();
+    std::function< void() > m_callback;
+    void lock_output_(void *data, void **p_pixels);
+    void update_(void *data, void *id);
+    void unlock_output_(void *data, void *id, void *const *p_pixels);
   };
 }
