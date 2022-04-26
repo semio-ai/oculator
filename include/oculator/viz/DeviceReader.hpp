@@ -1,28 +1,43 @@
 #pragma once
 
-#include <vlc/vlc.h>
+#include <gst/gst.h>
 #include <mutex>
 #include <functional>
 
 namespace oculator
 {
+
+  /* Structure to contain all our information, so we can pass it around */
+  typedef struct _DeviceReaderStruct {
+    GstElement *gst_play;           /* Our one and only pipeline */
+    GstElement *gst_sink;           /* Our one and only pipeline */
+
+    GstState state;                 /* Current state of the pipeline */
+    uint32_t width, height;         /* Width and height of the video */
+  } DeviceReaderStruct;
+
   class DeviceReader
   {
   public:
     DeviceReader(std::string uri);
     ~DeviceReader();
     
-    bool is_playing();
+    bool isPlaying();
+    bool waitForCompletion();
   private:
-    libvlc_instance_t *m_vlc_instance;
-    libvlc_media_player_t *m_vlc_player;
-    bool m_is_initialized;
-    std::mutex mutex;
+    bool mIsInitialized;
+    bool mIsPlaying;
 
-    bool initializeVLC();
-    std::function< void() > m_callback;
-    void lock_output_(void *data, void **p_pixels);
-    void update_(void *data, void *id);
-    void unlock_output_(void *data, void *id, void *const *p_pixels);
+    GMainLoop *mGSTLoop;
+    GMainContext *mGSTContext;
+    GstElement *mPipeline;
+
+    std::mutex mMutex;
+    DeviceReaderStruct mInternalGSTStruct;
+
+    bool initializeGST();
+    void shutdownGST();
+    std::function< void() > mCallback;
+    void update(void *data, void *id);
   };
 }

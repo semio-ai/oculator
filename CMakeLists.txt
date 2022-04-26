@@ -53,10 +53,12 @@ endif ()
 
 find_package(PkgConfig REQUIRED)
 find_package(Torch REQUIRED)
+
 # find_package(cxxopts REQUIRED)
 
 pkg_check_modules(IL REQUIRED IMPORTED_TARGET IL)
 pkg_check_modules(ILU REQUIRED IMPORTED_TARGET ILU)
+pkg_check_modules(GST REQUIRED IMPORTED_TARGET gstreamer-1.0)
 
 
 if (BUILD_VIZ)
@@ -79,6 +81,9 @@ include_directories("include/")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${IL2_CXX_FLAGS} ${VIZ_CXX_FLAGS}")
 
 include_directories("third_party/cxxopts")
+include_directories("/opt/homebrew/Cellar/libvlc-3.0.16-arm/64/include")
+link_directories("/opt/homebrew/Cellar/libvlc-3.0.16-arm/64/lib")
+# include_directories("/Applications/VLC.app/Contents/MacOS/include")
 
 if (BUILD_VIZ)
   file(GLOB HEADERS_TO_MOC include/oculator/viz/*.hpp)
@@ -88,8 +93,8 @@ if (BUILD_VIZ)
                 OPTIONS --no-notes) # Don't display a note for the headers which don't produce a moc_*.cpp
 
   add_executable(oculator src/viz/mainwindow.ui ${SOURCES} ${PROCESSED_MOCS})
-  target_link_libraries(oculator PUBLIC ${TORCH_LIBRARIES} PkgConfig::IL PkgConfig::ILU Qt5::Core Qt5::Widgets) 
+  target_link_libraries(oculator PUBLIC ${TORCH_LIBRARIES} PkgConfig::IL PkgConfig::ILU Qt5::Core Qt5::Widgets PkgConfig::GST) 
 else ()
   add_executable(oculator src/main.cpp ${SOURCES})
-  target_link_libraries(oculator PUBLIC ${TORCH_LIBRARIES} PkgConfig::IL PkgConfig::ILU)
+  target_link_libraries(oculator PUBLIC ${TORCH_LIBRARIES} PkgConfig::IL PkgConfig::ILU vlc)
 endif ()

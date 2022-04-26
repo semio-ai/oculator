@@ -1,16 +1,32 @@
+/**
+ *   ____  ____  _     _     ____  _____  ____  ____ 
+ *  /  _ \/   _\/ \ /\/ \   /  _ \/__ __\/  _ \/  __\
+ *  | / \||  /  | | ||| |   | / \|  / \  | / \||  \/|
+ *  | \_/||  \_ | \_/|| |_/\| |-||  | |  | \_/||    /
+ *  \____/\____/\____/\____/\_/ \|  \_/  \____/\_/\_\
+ * 
+ * Oculator's main entry point. Really this just triggers the model loading and the video feed. 
+ * 
+ * @author: ndepalma@alum.mit.edu
+ * @license: MIT License
+ */                                             
+
+
+
 #include <iostream>
 #include <cstdint>
 #include <cxxopts.hpp>
 #include <variant>
+#include <chrono>
+#include <thread>
 
 #include <torch/torch.h>
+#include "oculator/viz/DeviceReader.hpp"
 
 #if (VIZ == 1)
 #include <QtWidgets/QApplication>
 #include <QtCore/QTimer>
 #include "viz/ui_mainwindow.h"
-#include "oculator/viz/DeviceReader.hpp"
-
 #endif
 
 #include "oculator/utils/image_utils.h"
@@ -48,9 +64,17 @@ torch::Tensor perform_deep_gaze_inference(torch::jit::script::Module model,
   return saliency_map;
 }
 
+using namespace std::chrono_literals;
+
+typedef enum {
+  LOOP_FOREVER,
+  LOOP_UNTIL_COMPLETE,
+  SINGLE_FRAME
+} PLAY_MODE;
+
 int main(int argc, char *argv[])
 {
-
+  PLAY_MODE how_long_to_run = SINGLE_FRAME;
   cxxopts::Options options{"oculator", "A framework for real time intelligent vision for social robotics"};
   options.add_options()
     ("d,device", "Open Video Device {webcam}", cxxopts::value<int>())
@@ -72,6 +96,7 @@ int main(int argc, char *argv[])
   // Parse video target from command line
   Target target(0);
   std::string filename;
+  std::shared_ptr<DeviceReader> device;
   if (result.count("device") + result.count("uri") + result.count("image") > 1)
   {
     std::cerr << "Error: --device, --image, and --uri are mutually exclusive" << std::endl;
@@ -80,17 +105,21 @@ int main(int argc, char *argv[])
   else if (result.count("device"))
   {
     target = result["device"].as<int>();
+    how_long_to_run = LOOP_FOREVER;
   }
   else if (result.count("uri"))
   {
     target = result["uri"].as<std::string>();
+    filename = std::get<std::string>(target);
+    device = std::make_shared<DeviceReader>(filename);
+    how_long_to_run = LOOP_UNTIL_COMPLETE;
   }
   else if (result.count("image"))
   {
     target = result["image"].as<std::string>();
     filename = std::get<std::string>(target);
     std::cout << "Opening image target " << filename << std::endl;
-    
+    how_long_to_run = SINGLE_FRAME;
   }
   else
   {
@@ -98,85 +127,69 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  // Create the cv::VideoCapture with either a device ID or URI
-  // std::unique_ptr<cv::VideoCapture> cap;
-  // if {std::holds_alternative<int>{target}}
-  // {
-  //   cap = std::make_unique<cv::VideoCapture>{std::get<int>{target}};
-  // }
-  // else
-  // {
-  //   cap = std::make_unique<cv::VideoCapture>{std::get<std::string>{target}};
-  // }
-
-  // if {resolution_x} cap->set{cv::CAP_PROP_FRAME_WIDTH, *resolution_x};
-  // if {resolution_y} cap->set{cv::CAP_PROP_FRAME_HEIGHT, *resolution_y};
+  switch(how_long_to_run) {
+    case LOOP_UNTIL_COMPLETE:
+      device->waitForCompletion();
+      break;
+    case SINGLE_FRAME:
+      {
+        // Load the raw image to process
+        torch::Tensor raw_image = image_utils::loadFile(filename.c_str());
+        raw_image = raw_image.slice(1, 0,768).slice(0,0,1024);
+        
+        // Prepare the raw image for inference
+        torch::Tensor inference_img = torch::transpose(raw_image.clone(), 0, 2);
+        inference_img = inference_img.unsqueeze(0);
+      }
+       break;    
+    default:
+      std::cerr << "Error: case not handled yet.\n";
+  }
 
   // Load the model and weights
-  torch::jit::script::Module module = torch_utils::loadModel("/Users/drobotnik/projects/oculator/models/deepgaze.pth");
+  // torch::jit::script::Module module = torch_utils::loadModel("/Users/drobotnik/projects/oculator/models/deepgaze.pth");
   
-  // Load the raw image to process
-  torch::Tensor raw_image = image_utils::loadFile(filename.c_str());
-  raw_image = raw_image.slice(1, 0,768).slice(0,0,1024);
   
   // Load the bias input (it's a constant for DeepGaze)
-  torch::Tensor centerbias = torch_utils::loadTensor("/Users/drobotnik/projects/oculator/models/centerbias.pt", "cb");
-  centerbias = centerbias.clone().unsqueeze(0);
+  // torch::Tensor centerbias = torch_utils::loadTensor("/Users/drobotnik/projects/oculator/models/centerbias.pt", "cb");
+  // centerbias = centerbias.clone().unsqueeze(0);
 
-  // Prepare the raw image for inference
-  torch::Tensor inference_img = torch::transpose(raw_image.clone(), 0, 2);
-  inference_img = inference_img.unsqueeze(0);
+  
 
-  // Perform the inference
-  torch::Tensor saliency_map = perform_deep_gaze_inference(module, inference_img, centerbias);
+  // // Perform the inference
+  // torch::Tensor saliency_map = perform_deep_gaze_inference(module, inference_img, centerbias);
 
 #if (VIZ == 1)
   // Construct the GUI 
-  QApplication app(argc, argv);
+  // QApplication app(argc, argv);
 
-  QMainWindow main_window;
+  // QMainWindow main_window;
 
-  Ui::MainWindow ui;
-  ui.setupUi(&main_window);
+  // Ui::MainWindow ui;
+  // ui.setupUi(&main_window);
 
-  main_window.show();
+  // main_window.show();
 
-  QTimer timer;
-  timer.setInterval(30);
+  // QTimer timer;
+  // timer.setInterval(30);
 #endif
  
   // Transpose the raw image for viewing
-  raw_image = raw_image.clone();
-  raw_image = torch::transpose(raw_image, 0,1);
+  // raw_image = raw_image.clone();
+  // raw_image = torch::transpose(raw_image, 0,1);
 
 #if (VIZ == 1)
-  // Show the raw image
-  ui.raw->setTensor(raw_image, VIZ_RGB);
+  // // Show the raw image
+  // ui.raw->setTensor(raw_image, VIZ_RGB);
 
-  // Show the saliency image
-  ui.saliency->setTensor(saliency_map, VIZ_HEATMAP);
+  // // Show the saliency image
+  // ui.saliency->setTensor(saliency_map, VIZ_HEATMAP);
+  // std::this_thread::sleep_for(1s);
+  // std::cout<< "Go\n";
+
 #endif
-
-
-  //while {cv::waitKey{1} < 0}
-  // for{int i = 0;i < 15;i++}
-  // {
-  //   *cap >> frame;
-
-  //   if {frame.empty{}} break;
-    
-  //   //cv::imshow{"frame", frame};
-  //   saliency = RunMR_AIM{frame, Basis, mkAIM, num_pyramid_levels};
-
-  //   //cv::Mat saliency = model{frame};
-  //   //cv::imshow{"saliency", saliency};
-  // }
-
-  //DeviceReader reader(ui.raw, ui.saliency);
-  //QObject::connect(&timer, &QTimer::timeout, &reader, &DeviceReader::update);
-  //timer.start();
 #if (VIZ == 1)
-  return app.exec();
+  // return app.exec();
 #endif
   return 0;
 }
