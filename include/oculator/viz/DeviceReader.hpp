@@ -24,9 +24,17 @@ namespace oculator
     
     bool isPlaying();
     bool waitForCompletion();
+    void setImageWidth(const uint32_t width);
+    void setImageHeight(const uint32_t height);
+
+    uint32_t getImageWidth();
+    uint32_t getImageHeight();
   private:
     bool mIsInitialized;
     bool mIsPlaying;
+    bool mAreCapsKnown;
+
+    uint32_t mImageWidth, mImageHeight;
 
     GMainLoop *mGSTLoop;
     GMainContext *mGSTContext;
