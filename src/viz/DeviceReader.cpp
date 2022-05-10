@@ -36,6 +36,7 @@ static GstPadProbeReturn cb_have_data (GstPad          *pad,
                                        gpointer         user_data) {
   GstEvent *event = GST_PAD_PROBE_INFO_EVENT(info);
   // DeviceReader *reader = reinterpret_cast<DeviceReader *>(user_data);
+  g_print("CALLED\n");
   if (GST_EVENT_CAPS == GST_EVENT_TYPE(event)) {
     GstCaps * caps = gst_caps_new_any();
     gst_event_parse_caps(event, &caps);
@@ -55,7 +56,7 @@ static GstPadProbeReturn cb_have_data (GstPad          *pad,
     g_print(" Width: %d, Height: %d\n", width, height);
     g_print("Structure: %s\n", gst_structure_to_string(s));
     gst_caps_unref(caps);
-  } else if(GST_EVENT_TYPE(event) == GST_EVENT_UNKNOWN) {
+  } else { // if(GST_EVENT_TYPE(event) == 1208042016)
     gint x, y;
     GstMapInfo map;
     guint16 *ptr, t;
@@ -64,13 +65,13 @@ static GstPadProbeReturn cb_have_data (GstPad          *pad,
     buffer = GST_PAD_PROBE_INFO_BUFFER (info);
     if (buffer == NULL )
         return GST_PAD_PROBE_OK;
-    // g_print("Have data %s, %d\n", GST_EVENT_TYPE_NAME(event), GST_EVENT_TYPE(event));
+    g_print("Have data %s, %d\n", GST_EVENT_TYPE_NAME(event), GST_EVENT_TYPE(event));
     if(GST_IS_BUFFER(buffer)) {
       /* Making a buffer writable can fail (for example if it
       * cannot be copied and is used more than once)
       */
       int total_size = gst_buffer_get_size(buffer);
-      char *array = (char*)malloc(total_size);
+      unsigned char *array = (unsigned char *)malloc(total_size);
       gst_buffer_extract(buffer, 0, array, total_size);
       long reduce = 0;
       for(int h = 0;h < total_size;h++) {
@@ -83,17 +84,46 @@ static GstPadProbeReturn cb_have_data (GstPad          *pad,
         // Create the torch tensor to return and fill it from OpenIL. 
         uint32_t width = singleton->getImageWidth();
         uint32_t height = singleton->getImageHeight();
+        uint32_t stride = total_size / height;
+        g_print("Size %d with stride %f\n", total_size, (float)total_size/(float)height);
         // torch::Tensor imageData = torch::zeros({height,width,3}, torch::TensorOptions().dtype(torch::kUInt8));
-        torch::Tensor imageData = torch::zeros({3, height,width}, torch::TensorOptions().dtype(torch::kUInt8));
-        std::memcpy(imageData.data_ptr(), array, width*height*3);
+        torch::Tensor imageData = torch::zeros({height,width, 3}, torch::TensorOptions().dtype(torch::kUInt8));
+        for(int h = 0;h < height;h++) {
+          // std::memcpy(imageData[h].data_ptr(), array+(h*(width*3+2)), width*3);
+          std::memcpy(imageData[h].data_ptr(), array+(h*stride), width*3);
+        }
+        // std::memcpy(imageData.data_ptr(), array, width*height*3);
+        // torch::Tensor imageData = torch::from_blob(array, {height, width, 3});
+        
         g_print("MEMCPY SUCCEED\n");
+        auto imageData_a = imageData.accessor<unsigned char,3>();
+        for(int w = 0;w < width;w++) {
+          g_print("R: %d, G: %d, B: %d\n", array[w*3+0],
+                                           array[w*3+1],
+                                           array[w*3+2]);
           
+        }
+        g_print("\nR: %d, G: %d, B: %d, GG: %d, BB: %d\n", array[width*3+0],
+                                                           array[width*3+1],
+                                                           array[width*3+2],
+                                                           array[width*3+3],
+                                                           array[width*3+4]);
+        g_print("WR: %d, WG: %d, WB: %d\n", imageData_a[1][0][0],
+                                            imageData_a[1][0][1],
+                                            imageData_a[1][0][2]);
+        g_print("WR: %d, WG: %d, WB: %d\n", imageData_a[1][1][0],
+                                            imageData_a[1][1][1],
+                                            imageData_a[1][1][2]);
         torch::save(imageData, "img.pt");
         save_once = false;
+        exit(0);
       }  
       free(array);
     }
-  }
+  } 
+  // else {
+  //   g_print("EVENT TYPE %s, %d\n", GST_EVENT_TYPE_NAME(event), GST_EVENT_TYPE(event));
+  // }
   // If you're writing
   // GST_PAD_PROBE_INFO_DATA (info) = buffer;
 
@@ -143,7 +173,7 @@ on_pad_added (GstElement *element,
   //TODO: Catch this probe and free it later.
   // long id = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, this, NULL);
     // std::bind(cb_have_data, _1, _2, _3, reader);
-  long id = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, NULL, NULL);
+  // long id = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, NULL, NULL);
 }
 
 static void state_changed_cb (GstBus *bus, GstMessage *msg, DeviceReaderStruct *data) {
@@ -212,7 +242,13 @@ bool DeviceReader::initializeGST() {
 
   /* Create the elements */
   mInternalGSTStruct.gst_play = gst_element_factory_make ("uridecodebin", "uridecodebin");
+  mInternalGSTStruct.gst_conv = gst_element_factory_make ("videoconvert", "videoconvert");
   mInternalGSTStruct.gst_sink = gst_element_factory_make ("autovideosink", "autovideosink");
+
+  GstCaps * caps = gst_caps_new_simple ("video/x-raw",
+                                        "format", G_TYPE_STRING, "RGB",
+                                        NULL);
+  
   // mInternalGSTStruct.gst_sink = gst_element_factory_make ("fakesink", "fakesink");
 
   if (!mInternalGSTStruct.gst_play || !mInternalGSTStruct.gst_sink) {
@@ -226,10 +262,21 @@ bool DeviceReader::initializeGST() {
   /* Set the URI to play */
   
   
-  gst_bin_add_many (GST_BIN (mPipeline), mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_sink, NULL);
-  gst_element_link_many (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_sink, NULL);
+  gst_bin_add_many (GST_BIN (mPipeline), mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink, NULL);
+  // gst_element_link_many (mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink, NULL);
+  // gst_element_link_many (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_conv, NULL);
+  
+  // gst_element_link (mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink);
+  // gst_element_link (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_conv);
 
+  gst_element_link_many (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink, NULL);
+  
+  
+  gst_element_link_filtered(mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink, caps);
+  // gst_element_link_many (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_sink, NULL);
   g_object_set (mInternalGSTStruct.gst_play, "uri", filename, NULL);
+  // g_object_set (mInternalGSTStruct.gst_conv, "format", "RGB", NULL);
+  // g_object_set (mInternalGSTStruct.gst_conv, "caps", caps, NULL);
 
   /* Instruct the bus to emit signals for each received message, and connect to the interesting signals */
   GstBus *bus = gst_element_get_bus (mPipeline);
@@ -240,12 +287,15 @@ bool DeviceReader::initializeGST() {
   gst_object_unref (bus);
 
   /* Finally connect to the pad added event which will let us probe the images and convert to torch tensors */
-  g_signal_connect (mInternalGSTStruct.gst_play, "pad-added", G_CALLBACK (on_pad_added), mInternalGSTStruct.gst_sink);
-  // GstPad *pad;
-  // pad = gst_element_get_static_pad (mInternalGSTStruct.gst_play, "src");
-  // long id = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, (GstPadProbeCallback) cb_have_data, NULL, NULL);
-// GST_PAD_PROBE_TYPE_EVENT_BOTH
-  // gst_object_unref (pad);
+  g_signal_connect (mInternalGSTStruct.gst_play, "pad-added", G_CALLBACK (on_pad_added), mInternalGSTStruct.gst_conv);
+  // g_signal_connect (mInternalGSTStruct.gst_conv, "pad-added", G_CALLBACK (on_pad_added), mInternalGSTStruct.gst_sink);
+  GstPad  *pad = gst_element_get_static_pad(mInternalGSTStruct.gst_conv, "src");
+  if(pad != NULL) {
+    g_print("PAD RETREIVED\n");
+    gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, NULL, NULL);
+  } else {
+    g_print("PAD NOT RETREIVED\n");
+  }
   /* Start playing */
   ret = gst_element_set_state (mPipeline, GST_STATE_PLAYING);
   if (ret == GST_STATE_CHANGE_FAILURE) {

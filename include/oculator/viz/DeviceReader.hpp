@@ -10,6 +10,7 @@ namespace oculator
   /* Structure to contain all our information, so we can pass it around */
   typedef struct _DeviceReaderStruct {
     GstElement *gst_play;           /* Our one and only pipeline */
+    GstElement *gst_conv;           /* Our one and only pipeline */
     GstElement *gst_sink;           /* Our one and only pipeline */
 
     GstState state;                 /* Current state of the pipeline */
