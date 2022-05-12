@@ -4,6 +4,8 @@
 #include <mutex>
 #include <functional>
 
+#include <torch/torch.h>
+
 namespace oculator
 {
 
@@ -15,12 +17,13 @@ namespace oculator
 
     GstState state;                 /* Current state of the pipeline */
     uint32_t width, height;         /* Width and height of the video */
+    bool should_quit;
   } DeviceReaderStruct;
 
   class DeviceReader
   {
   public:
-    DeviceReader(std::string uri);
+    DeviceReader(std::string uri, std::function< void(torch::Tensor) > callback);
     ~DeviceReader();
     
     bool isPlaying();
@@ -30,6 +33,12 @@ namespace oculator
 
     uint32_t getImageWidth();
     uint32_t getImageHeight();
+
+    friend GstPadProbeReturn cb_have_data (GstPad          *pad,
+                                                  GstPadProbeInfo *info,
+                                                  gpointer         user_data);
+    void pump(torch::Tensor &tensor);
+    void iterate();
   private:
     bool mIsInitialized;
     bool mIsPlaying;
@@ -46,7 +55,8 @@ namespace oculator
 
     bool initializeGST();
     void shutdownGST();
-    std::function< void() > mCallback;
-    void update(void *data, void *id);
+
+    
+    std::function< void(torch::Tensor) > mCallback;
   };
 }

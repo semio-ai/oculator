@@ -19,24 +19,22 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <torch/torch.h>
-
 #include <functional>
 #include<iostream>
+#include <chrono>
+#include <thread>
 
-static bool save_once = true;
+using namespace std::chrono_literals;
 
 using namespace oculator;
 using namespace std::placeholders;
-static DeviceReader *singleton = NULL;
 
 
-static GstPadProbeReturn cb_have_data (GstPad          *pad,
+GstPadProbeReturn cb_have_data (GstPad          *pad,
                                        GstPadProbeInfo *info,
                                        gpointer         user_data) {
   GstEvent *event = GST_PAD_PROBE_INFO_EVENT(info);
-  // DeviceReader *reader = reinterpret_cast<DeviceReader *>(user_data);
-  g_print("CALLED\n");
+  DeviceReader *reader = reinterpret_cast<DeviceReader *>(user_data);
   if (GST_EVENT_CAPS == GST_EVENT_TYPE(event)) {
     GstCaps * caps = gst_caps_new_any();
     gst_event_parse_caps(event, &caps);
@@ -51,8 +49,8 @@ static GstPadProbeReturn cb_have_data (GstPad          *pad,
     if (!res)
       g_print( "no dimensions");
 
-    singleton->setImageWidth(width);    
-    singleton->setImageHeight(height);
+    reader->setImageWidth(width);    
+    reader->setImageHeight(height);
     g_print(" Width: %d, Height: %d\n", width, height);
     g_print("Structure: %s\n", gst_structure_to_string(s));
     gst_caps_unref(caps);
@@ -65,7 +63,7 @@ static GstPadProbeReturn cb_have_data (GstPad          *pad,
     buffer = GST_PAD_PROBE_INFO_BUFFER (info);
     if (buffer == NULL )
         return GST_PAD_PROBE_OK;
-    g_print("Have data %s, %d\n", GST_EVENT_TYPE_NAME(event), GST_EVENT_TYPE(event));
+    // g_print("Have data %s, %d\n", GST_EVENT_TYPE_NAME(event), GST_EVENT_TYPE(event));
     if(GST_IS_BUFFER(buffer)) {
       /* Making a buffer writable can fail (for example if it
       * cannot be copied and is used more than once)
@@ -73,52 +71,52 @@ static GstPadProbeReturn cb_have_data (GstPad          *pad,
       int total_size = gst_buffer_get_size(buffer);
       unsigned char *array = (unsigned char *)malloc(total_size);
       gst_buffer_extract(buffer, 0, array, total_size);
-      long reduce = 0;
-      for(int h = 0;h < total_size;h++) {
-        reduce += array[h];
-      }
-      g_print("Sum first 1000: %d\n", reduce);
+      // long reduce = 0;
+      // for(int h = 0;h < total_size;h++) {
+      //   reduce += array[h];
+      // }
+      // g_print("Sum first 1000: %d\n", reduce);
       
       /* Mapping a buffer can fail (non-writable) */
-      if(save_once) {
-        // Create the torch tensor to return and fill it from OpenIL. 
-        uint32_t width = singleton->getImageWidth();
-        uint32_t height = singleton->getImageHeight();
-        uint32_t stride = total_size / height;
-        g_print("Size %d with stride %f\n", total_size, (float)total_size/(float)height);
-        // torch::Tensor imageData = torch::zeros({height,width,3}, torch::TensorOptions().dtype(torch::kUInt8));
-        torch::Tensor imageData = torch::zeros({height,width, 3}, torch::TensorOptions().dtype(torch::kUInt8));
-        for(int h = 0;h < height;h++) {
-          // std::memcpy(imageData[h].data_ptr(), array+(h*(width*3+2)), width*3);
-          std::memcpy(imageData[h].data_ptr(), array+(h*stride), width*3);
-        }
-        // std::memcpy(imageData.data_ptr(), array, width*height*3);
-        // torch::Tensor imageData = torch::from_blob(array, {height, width, 3});
+      // Create the torch tensor to return and fill it from OpenIL. 
+      uint32_t width = reader->getImageWidth();
+      uint32_t height = reader->getImageHeight();
+      uint32_t stride = total_size / height;
+      // g_print("Size %d with stride %f\n", total_size, (float)total_size/(float)height);
+      // torch::Tensor imageData = torch::zeros({height,width,3}, torch::TensorOptions().dtype(torch::kUInt8));
+      torch::Tensor imageData = torch::zeros({height,width, 3}, torch::TensorOptions().dtype(torch::kUInt8));
+      for(int h = 0;h < height;h++) {
+        // std::memcpy(imageData[h].data_ptr(), array+(h*(width*3+2)), width*3);
+        std::memcpy(imageData[h].data_ptr(), array+(h*stride), width*3);
+      }
+      // std::memcpy(imageData.data_ptr(), array, width*height*3);
+      // torch::Tensor imageData = torch::from_blob(array, {height, width, 3});
+      
+      // g_print("MEMCPY SUCCEED\n");
+      // auto imageData_a = imageData.accessor<unsigned char,3>();
+      // for(int w = 0;w < width;w++) {
+      //   g_print("R: %d, G: %d, B: %d\n", array[w*3+0],
+      //                                    array[w*3+1],
+      //                                    array[w*3+2]);
         
-        g_print("MEMCPY SUCCEED\n");
-        auto imageData_a = imageData.accessor<unsigned char,3>();
-        for(int w = 0;w < width;w++) {
-          g_print("R: %d, G: %d, B: %d\n", array[w*3+0],
-                                           array[w*3+1],
-                                           array[w*3+2]);
-          
-        }
-        g_print("\nR: %d, G: %d, B: %d, GG: %d, BB: %d\n", array[width*3+0],
-                                                           array[width*3+1],
-                                                           array[width*3+2],
-                                                           array[width*3+3],
-                                                           array[width*3+4]);
-        g_print("WR: %d, WG: %d, WB: %d\n", imageData_a[1][0][0],
-                                            imageData_a[1][0][1],
-                                            imageData_a[1][0][2]);
-        g_print("WR: %d, WG: %d, WB: %d\n", imageData_a[1][1][0],
-                                            imageData_a[1][1][1],
-                                            imageData_a[1][1][2]);
-        torch::save(imageData, "img.pt");
-        save_once = false;
-        exit(0);
-      }  
+      // }
+      // g_print("\nR: %d, G: %d, B: %d, GG: %d, BB: %d\n", array[width*3+0],
+      //                                                    array[width*3+1],
+      //                                                    array[width*3+2],
+      //                                                    array[width*3+3],
+      //                                                    array[width*3+4]);
+      // g_print("WR: %d, WG: %d, WB: %d\n", imageData_a[1][0][0],
+      //                                     imageData_a[1][0][1],
+      //                                     imageData_a[1][0][2]);
+      // g_print("WR: %d, WG: %d, WB: %d\n", imageData_a[1][1][0],
+      //                                     imageData_a[1][1][1],
+      //                                     imageData_a[1][1][2]);
+      // torch::save(imageData, "img.pt");
+      // save_once = false;
+      // exit(0);
       free(array);
+      reader->pump(imageData); 
+      
     }
   } 
   // else {
@@ -151,6 +149,7 @@ static void error_cb (GstBus *bus, GstMessage *msg, DeviceReaderStruct *data) {
 static void eos_cb (GstBus *bus, GstMessage *msg, DeviceReaderStruct *data) {
   g_print ("End-Of-Stream reached.\n");
   gst_element_set_state (data->gst_play, GST_STATE_READY);
+  data->should_quit = true;
 }
 
 static void
@@ -191,9 +190,10 @@ static void state_changed_cb (GstBus *bus, GstMessage *msg, DeviceReaderStruct *
   }
 }
 
-DeviceReader::DeviceReader(std::string uri) : mMutex{}
+DeviceReader::DeviceReader(std::string uri, std::function< void(torch::Tensor) > callback) : 
+                                                                  mMutex{},
+                                                                  mCallback{callback}
 {
-  singleton = this;
   mIsInitialized = initializeGST();
 
   if(mIsInitialized) {
@@ -241,15 +241,16 @@ bool DeviceReader::initializeGST() {
   memset (&mInternalGSTStruct, 0, sizeof (mInternalGSTStruct));
 
   /* Create the elements */
+  mInternalGSTStruct.should_quit = false;
   mInternalGSTStruct.gst_play = gst_element_factory_make ("uridecodebin", "uridecodebin");
   mInternalGSTStruct.gst_conv = gst_element_factory_make ("videoconvert", "videoconvert");
-  mInternalGSTStruct.gst_sink = gst_element_factory_make ("autovideosink", "autovideosink");
-
+  // mInternalGSTStruct.gst_sink = gst_element_factory_make ("autovideosink", "autovideosink");
+  mInternalGSTStruct.gst_sink = gst_element_factory_make ("fakesink", "fakesink");
   GstCaps * caps = gst_caps_new_simple ("video/x-raw",
                                         "format", G_TYPE_STRING, "RGB",
                                         NULL);
   
-  // mInternalGSTStruct.gst_sink = gst_element_factory_make ("fakesink", "fakesink");
+  
 
   if (!mInternalGSTStruct.gst_play || !mInternalGSTStruct.gst_sink) {
     g_printerr ("Not all elements could be created.\n");
@@ -292,7 +293,7 @@ bool DeviceReader::initializeGST() {
   GstPad  *pad = gst_element_get_static_pad(mInternalGSTStruct.gst_conv, "src");
   if(pad != NULL) {
     g_print("PAD RETREIVED\n");
-    gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, NULL, NULL);
+    gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, this, NULL);
   } else {
     g_print("PAD NOT RETREIVED\n");
   }
@@ -330,7 +331,7 @@ bool DeviceReader::initializeGST() {
   //   }
   // }
 
-  g_main_loop_run (mGSTLoop);
+  // g_main_loop_run (mGSTLoop);
   // bool quit = false;
   // while(!quit) {
   //   if(!g_main_context_iteration (mGSTContext, FALSE)) {
@@ -340,43 +341,23 @@ bool DeviceReader::initializeGST() {
   //     g_print("Iterated\n");
   //   }
   // }
-  g_print("Shutting down\n");
-  /* Free resources */
-  shutdownGST();
+  // g_print("Shutting down\n");
+  // /* Free resources */
+  // shutdownGST();
 
   return true;
 }
 
-void DeviceReader::update(void *data, void *id)
-{
-  std::cout<< "Update called\n";
-  /*if (!capture_.grab())
-  {
-    qWarning() << "Failed to grab frame";
-    return;
-  }
-
-  cv::Mat frame;
-  if (!capture_.retrieve(frame))
-  {
-    qWarning() << "Failed to retrieve frame";
-    return;
-  }
-
-  target_->setMat(frame);
-
-  saliency_->setMat(RunMR_AIM(frame, basis_, *mk_aim_, 0));
-  */
-}
 
 bool DeviceReader::isPlaying() {
   return mIsPlaying;
 }
 
 bool DeviceReader::waitForCompletion() {
-  // if(m_is_initialized)
-  //   return libvlc_media_player_is_playing(m_vlc_player);
-  return false;
+  while(!mInternalGSTStruct.should_quit) {
+    std::this_thread::sleep_for(1s);
+  }
+  return true;
 }
 
 void DeviceReader::setImageWidth(const uint32_t width) {
@@ -393,4 +374,16 @@ uint32_t DeviceReader::getImageWidth() {
 
 uint32_t DeviceReader::getImageHeight() {
   return mImageHeight;
+}
+
+void DeviceReader::pump(torch::Tensor &tensor) {
+  mCallback(tensor);
+}
+
+void DeviceReader::iterate() {
+  if(!g_main_context_iteration (mGSTContext, FALSE)) {
+    g_print("BROKEN\n");
+  } else {
+    g_print("Iterated\n");
+  }
 }

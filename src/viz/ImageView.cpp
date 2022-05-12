@@ -287,8 +287,8 @@ namespace oculator {
     switch(mode) {
       case VIZ_RGB:
         // Get the data from the torch tensor
-        width = tensor.size(0);
-        height = tensor.size(1);
+        height = tensor.size(0);
+        width = tensor.size(1);
         img_data = tensor.data_ptr<unsigned char>();
 #ifdef _DEBUG
         std::cout << "Width: " << width << "; Height: " << height << "; data: " << reinterpret_cast<std::uintptr_t>(img_data) << std::endl;
