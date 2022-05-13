@@ -6,6 +6,7 @@ An implementation of oculesic (visual attention) behavior generation. This libra
   * Qt (For visualization)
   * OpenIL (For image loading)
   * Torch (For inference)
+  * GStreamer (For reading video files, RTSP, and webcam)
 
 ## Building
 
@@ -25,3 +26,7 @@ make -j4
 # Start the salency example with the default camera and a resolution of 640x480
 ./examples/saliency/saliency --device=0 --resolution_x=640 --resolution_y=480
 ```
+
+
+# TODOs 
+QT has a framework for video reading. Use it?

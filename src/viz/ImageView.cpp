@@ -1,3 +1,15 @@
+/**
+ *   ____  ____  _     _     ____  _____  ____  ____ 
+ *  /  _ \/   _\/ \ /\/ \   /  _ \/__ __\/  _ \/  __\
+ *  | / \||  /  | | ||| |   | / \|  / \  | / \||  \/|
+ *  | \_/||  \_ | \_/|| |_/\| |-||  | |  | \_/||    /
+ *  \____/\____/\____/\____/\_/ \|  \_/  \____/\_/\_\
+ * 
+ * ImageView displays RGB and heat maps for the data being streamed.
+ * 
+ * @author: ndepalma@alum.mit.edu
+ * @license: MIT License
+ */ 
 #include "oculator/viz/ImageView.hpp"
 
 namespace oculator {
@@ -267,9 +279,7 @@ namespace oculator {
 
   ImageView::~ImageView() {
   }
-  /**
-   * Gets the hot colormap to be used for visualizing grayscale images.
-   */
+
   static QVector<QRgb> getHotColorMap() {
       QVector<QRgb> colorTable(256);
       for (int i = 0; i < 255; i++) {
@@ -280,7 +290,8 @@ namespace oculator {
       }
       return colorTable;
   }
-  void ImageView::setTensor(const torch::Tensor &tensor, VizMode mode) {
+
+  void ImageView::setTensor(const torch::Tensor &tensor, const VizMode mode) {
     int width, height;
     unsigned char* img_data;
 
@@ -290,15 +301,9 @@ namespace oculator {
         height = tensor.size(0);
         width = tensor.size(1);
         img_data = tensor.data_ptr<unsigned char>();
-#ifdef _DEBUG
-        std::cout << "Width: " << width << "; Height: " << height << "; data: " << reinterpret_cast<std::uintptr_t>(img_data) << std::endl;
-#endif
         {
           QImage image(img_data, width, height, sizeof(unsigned char)*3*width, QImage::Format_RGB888);
           setPixmap(QPixmap::fromImage(image).scaled(size(), Qt::KeepAspectRatio));
-#ifdef _DEBUG
-          image.save("/Users/drobotnik/blah.jpg");
-#endif
         }
         break;
 
@@ -306,9 +311,6 @@ namespace oculator {
         width = tensor.size(0);
         height = tensor.size(1);
         img_data = tensor.data_ptr<unsigned char>();
-#ifdef _DEBUG
-        std::cout << "Width: " << width << "; Height: " << height << "; data: " << reinterpret_cast<std::uintptr_t>(src_data) << std::endl;
-#endif
         {   
           // Extract it to a Qt data structure
           QImage greyscale(img_data, width, height, sizeof(unsigned char)*width, QImage::Format_Grayscale8);
@@ -318,9 +320,6 @@ namespace oculator {
           myTransform.rotate(90);
           greyscale = greyscale.transformed(myTransform).mirrored(true, false);
 
-#ifdef _DEBUG
-          rotated.save("/Users/drobotnik/blah2.jpg");
-#endif
           // apply the heatmap
           QImage indexed_image = greyscale.convertToFormat(QImage::Format_Indexed8);
           indexed_image.setColorTable(getHotColorMap());
@@ -328,7 +327,6 @@ namespace oculator {
 
           // Finally display it.
           setPixmap(QPixmap::fromImage(indexed_image).scaled(size(), Qt::KeepAspectRatio));
-          
         }
         break;
     }

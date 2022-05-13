@@ -1,5 +1,3 @@
-#include "oculator/viz/DeviceReader.hpp"
-
 /**
  *   ____  ____  _     _     ____  _____  ____  ____ 
  *  /  _ \/   _\/ \ /\/ \   /  _ \/__ __\/  _ \/  __\
@@ -7,11 +5,13 @@
  *  | \_/||  \_ | \_/|| |_/\| |-||  | |  | \_/||    /
  *  \____/\____/\____/\____/\_/ \|  \_/  \____/\_/\_\
  * 
- * Oculator's main entry point. Really this just triggers the model loading and the video feed. 
+ * Uses GStreamer to read streaming media like webcams, online video, and movie files.
+ * Streams to a torch tensor.
  * 
  * @author: ndepalma@alum.mit.edu
  * @license: MIT License
  */ 
+#include "oculator/viz/DeviceReader.hpp"
 
 #include <gst/gstplugin.h>
 
@@ -25,14 +25,12 @@
 #include <thread>
 
 using namespace std::chrono_literals;
-
 using namespace oculator;
 using namespace std::placeholders;
 
-
-GstPadProbeReturn cb_have_data (GstPad          *pad,
-                                       GstPadProbeInfo *info,
-                                       gpointer         user_data) {
+GstPadProbeReturn oculator::cb_have_data (GstPad *pad,
+                                GstPadProbeInfo *info,
+                                DeviceReader    *user_data) {
   GstEvent *event = GST_PAD_PROBE_INFO_EVENT(info);
   DeviceReader *reader = reinterpret_cast<DeviceReader *>(user_data);
   if (GST_EVENT_CAPS == GST_EVENT_TYPE(event)) {
@@ -47,12 +45,12 @@ GstPadProbeReturn cb_have_data (GstPad          *pad,
     res |= gst_structure_get_int (s, "height", &height);
 
     if (!res)
-      g_print( "no dimensions");
+      g_error( "no dimensions");
 
-    reader->setImageWidth(width);    
-    reader->setImageHeight(height);
+    reader->mImageWidth = width;
+    reader->mImageHeight = height;
     g_print(" Width: %d, Height: %d\n", width, height);
-    g_print("Structure: %s\n", gst_structure_to_string(s));
+    // g_print("Structure: %s\n", gst_structure_to_string(s));
     gst_caps_unref(caps);
   } else { // if(GST_EVENT_TYPE(event) == 1208042016)
     gint x, y;
@@ -63,73 +61,32 @@ GstPadProbeReturn cb_have_data (GstPad          *pad,
     buffer = GST_PAD_PROBE_INFO_BUFFER (info);
     if (buffer == NULL )
         return GST_PAD_PROBE_OK;
-    // g_print("Have data %s, %d\n", GST_EVENT_TYPE_NAME(event), GST_EVENT_TYPE(event));
+    
     if(GST_IS_BUFFER(buffer)) {
-      /* Making a buffer writable can fail (for example if it
-      * cannot be copied and is used more than once)
-      */
+
       int total_size = gst_buffer_get_size(buffer);
       unsigned char *array = (unsigned char *)malloc(total_size);
       gst_buffer_extract(buffer, 0, array, total_size);
-      // long reduce = 0;
-      // for(int h = 0;h < total_size;h++) {
-      //   reduce += array[h];
-      // }
-      // g_print("Sum first 1000: %d\n", reduce);
       
-      /* Mapping a buffer can fail (non-writable) */
       // Create the torch tensor to return and fill it from OpenIL. 
-      uint32_t width = reader->getImageWidth();
-      uint32_t height = reader->getImageHeight();
-      uint32_t stride = total_size / height;
-      // g_print("Size %d with stride %f\n", total_size, (float)total_size/(float)height);
-      // torch::Tensor imageData = torch::zeros({height,width,3}, torch::TensorOptions().dtype(torch::kUInt8));
+      const uint32_t width = reader->mImageWidth;
+      const uint32_t height = reader->mImageHeight;
+      const uint32_t stride = total_size / height;
       torch::Tensor imageData = torch::zeros({height,width, 3}, torch::TensorOptions().dtype(torch::kUInt8));
-      for(int h = 0;h < height;h++) {
-        // std::memcpy(imageData[h].data_ptr(), array+(h*(width*3+2)), width*3);
+
+      for(int h = 0;h < height;h++)
         std::memcpy(imageData[h].data_ptr(), array+(h*stride), width*3);
-      }
-      // std::memcpy(imageData.data_ptr(), array, width*height*3);
-      // torch::Tensor imageData = torch::from_blob(array, {height, width, 3});
-      
-      // g_print("MEMCPY SUCCEED\n");
-      // auto imageData_a = imageData.accessor<unsigned char,3>();
-      // for(int w = 0;w < width;w++) {
-      //   g_print("R: %d, G: %d, B: %d\n", array[w*3+0],
-      //                                    array[w*3+1],
-      //                                    array[w*3+2]);
-        
-      // }
-      // g_print("\nR: %d, G: %d, B: %d, GG: %d, BB: %d\n", array[width*3+0],
-      //                                                    array[width*3+1],
-      //                                                    array[width*3+2],
-      //                                                    array[width*3+3],
-      //                                                    array[width*3+4]);
-      // g_print("WR: %d, WG: %d, WB: %d\n", imageData_a[1][0][0],
-      //                                     imageData_a[1][0][1],
-      //                                     imageData_a[1][0][2]);
-      // g_print("WR: %d, WG: %d, WB: %d\n", imageData_a[1][1][0],
-      //                                     imageData_a[1][1][1],
-      //                                     imageData_a[1][1][2]);
-      // torch::save(imageData, "img.pt");
-      // save_once = false;
-      // exit(0);
+
       free(array);
       reader->pump(imageData); 
-      
     }
   } 
-  // else {
-  //   g_print("EVENT TYPE %s, %d\n", GST_EVENT_TYPE_NAME(event), GST_EVENT_TYPE(event));
-  // }
-  // If you're writing
-  // GST_PAD_PROBE_INFO_DATA (info) = buffer;
 
   return GST_PAD_PROBE_OK;
 }
 
 /* This function is called when an error message is posted on the bus */
-static void error_cb (GstBus *bus, GstMessage *msg, DeviceReaderStruct *data) {
+void oculator::error_cb (GstBus *bus, GstMessage *msg, DeviceReader *data) {
   GError *err;
   gchar *debug_info;
 
@@ -141,84 +98,62 @@ static void error_cb (GstBus *bus, GstMessage *msg, DeviceReaderStruct *data) {
   g_free (debug_info);
 
   /* Set the pipeline to READY (which stops playback) */
-  gst_element_set_state (data->gst_play, GST_STATE_READY);
+  gst_element_set_state (data->mGstPlay, GST_STATE_READY);
 }
 
 /* This function is called when an End-Of-Stream message is posted on the bus.
  * We just set the pipeline to READY (which stops playback) */
-static void eos_cb (GstBus *bus, GstMessage *msg, DeviceReaderStruct *data) {
+void oculator::eos_cb (GstBus *bus, GstMessage *msg, DeviceReader *data) {
   g_print ("End-Of-Stream reached.\n");
-  gst_element_set_state (data->gst_play, GST_STATE_READY);
+  gst_element_set_state (data->mGstPlay, GST_STATE_READY);
   data->should_quit = true;
 }
 
-static void
-on_pad_added (GstElement *element,
-              GstPad     *pad,
-              gpointer    data)
+static void on_pad_added (GstElement *element,
+                          GstPad     *pad,
+                          gpointer    data)
 {
   GstPad *sinkpad;
   GstElement *vid_sink = (GstElement *) data;
 
   /* We can now link this pad with the vorbis-decoder sink pad */
-  g_print ("Dynamic pad created, linking demuxer/sink\n");
-
   sinkpad = gst_element_get_static_pad (vid_sink, "sink");
 
   gst_pad_link (pad, sinkpad);
 
   gst_object_unref (sinkpad);
-
-  //TODO: Catch this probe and free it later.
-  // long id = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, this, NULL);
-    // std::bind(cb_have_data, _1, _2, _3, reader);
-  // long id = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, NULL, NULL);
 }
 
-static void state_changed_cb (GstBus *bus, GstMessage *msg, DeviceReaderStruct *data) {
+void oculator::state_changed_cb (GstBus *bus, GstMessage *msg, DeviceReader *data) {
   GstState old_state, new_state, pending_state;
   gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
-  if (GST_MESSAGE_SRC (msg) == GST_OBJECT (data->gst_play)) {
-    data->state = new_state;
+  if (GST_MESSAGE_SRC (msg) == GST_OBJECT (data->mGstPlay)) {
+    data->mState = new_state;
     // g_print ("State was %s\n", gst_element_state_get_name (old_state));
     g_print ("State set to %s\n", gst_element_state_get_name (new_state));
-    // g_print ("State pending %s\n", gst_element_state_get_name (pending_state));
-    // if (old_state == GST_STATE_READY && new_state == GST_STATE_PAUSED) {
-    //   /* For extra responsiveness, we refresh the GUI as soon as we reach the PAUSED state */
-    //   // refresh_ui (data);
-    // }
   }
 }
 
-DeviceReader::DeviceReader(std::string uri, std::function< void(torch::Tensor) > callback) : 
-                                                                  mMutex{},
-                                                                  mCallback{callback}
-{
-  mIsInitialized = initializeGST();
-
-  if(mIsInitialized) {
-    // Check to see what kind of media we're dealing with and handle it appropriately
-    // if (uri.find("http") == 0)
-  //     vlc_media = libvlc_media_new_location (m_vlc_instance, uri.c_str());
-    // else {
-  //     std::cout << "Opening file: " << uri << std::endl;
-  //     vlc_media = libvlc_media_new_path (m_vlc_instance, uri.c_str() );
-    // }
-      // Make it loop
-  }
-  
+DeviceReader::DeviceReader(const std::string uri, 
+                           const std::function< void(torch::Tensor) > callback) : 
+                                      mCallback{callback} {
+  if(uri.rfind("file", 0) == 0)
+    mIsInitialized = initializeGST(uri, FROM_VIDEO_FILE);
+  else if(uri.rfind("/dev", 0) == 0)
+    mIsInitialized = initializeGST(uri, FROM_DEVICE);
+  else if(uri.rfind("rtsp", 0) == 0)
+    mIsInitialized = initializeGST(uri, FROM_RTSP);
 }
 
 void DeviceReader::shutdownGST() {
-  //TODO: Free everythign in order
-  if(mInternalGSTStruct.gst_play != NULL) {
-    gst_element_set_state (mInternalGSTStruct.gst_play, GST_STATE_READY);
+  if(mGstPlay != NULL) {
+    gst_element_set_state (mGstPlay, GST_STATE_READY);
 
     gst_object_unref(mPipeline);
     mPipeline = NULL;
     g_main_loop_unref(mGSTLoop);
     mGSTLoop = NULL;
-    mInternalGSTStruct.gst_play = NULL;
+    mGstPlay = NULL;
   }
 }
 
@@ -226,7 +161,7 @@ DeviceReader::~DeviceReader() {
     shutdownGST();
 }
 
-bool DeviceReader::initializeGST() {
+bool DeviceReader::initializeGST(const std::string uri, const SourceType type) {
   GstStateChangeReturn ret;
 
   /* Initialize GStreamer */
@@ -237,66 +172,55 @@ bool DeviceReader::initializeGST() {
   // filesrc location=CF1.png ! decodebin ! autovideosink
   mPipeline = gst_pipeline_new ("oculator-gst-pipeline");
 
-  /* Initialize our data structure */
-  memset (&mInternalGSTStruct, 0, sizeof (mInternalGSTStruct));
-
   /* Create the elements */
-  mInternalGSTStruct.should_quit = false;
-  mInternalGSTStruct.gst_play = gst_element_factory_make ("uridecodebin", "uridecodebin");
-  mInternalGSTStruct.gst_conv = gst_element_factory_make ("videoconvert", "videoconvert");
-  // mInternalGSTStruct.gst_sink = gst_element_factory_make ("autovideosink", "autovideosink");
-  mInternalGSTStruct.gst_sink = gst_element_factory_make ("fakesink", "fakesink");
+  should_quit = false;
+  if(type == FROM_VIDEO_FILE)
+    mGstPlay = gst_element_factory_make ("uridecodebin", "uridecodebin");
+  else if(type == FROM_DEVICE)
+    mGstPlay = gst_element_factory_make ("autovideosrc", "autovideosrc");
+  else if(type == FROM_DEVICE)
+    mGstPlay = gst_element_factory_make ("rtspsrc", "rtspsrc");
+  mGstConv = gst_element_factory_make ("videoconvert", "videoconvert");
+  // mGstSink = gst_element_factory_make ("autovideosink", "autovideosink");
+  mGstSink = gst_element_factory_make ("fakesink", "fakesink");
   GstCaps * caps = gst_caps_new_simple ("video/x-raw",
                                         "format", G_TYPE_STRING, "RGB",
                                         NULL);
-  
-  
 
-  if (!mInternalGSTStruct.gst_play || !mInternalGSTStruct.gst_sink) {
+  if (!mGstPlay || !mGstSink) {
     g_printerr ("Not all elements could be created.\n");
     shutdownGST();
     return false;
   }
-
-  char *filename = "file:///Users/drobotnik/Movies/Hedgehog_motion.avi";  
   
+  gst_bin_add_many (GST_BIN (mPipeline), mGstPlay, mGstConv, mGstSink, NULL);
+  gst_element_link_many (mGstPlay, mGstConv, mGstSink, NULL);
+  
+  gst_element_link_filtered(mGstConv, mGstSink, caps);
   /* Set the URI to play */
-  
-  
-  gst_bin_add_many (GST_BIN (mPipeline), mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink, NULL);
-  // gst_element_link_many (mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink, NULL);
-  // gst_element_link_many (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_conv, NULL);
-  
-  // gst_element_link (mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink);
-  // gst_element_link (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_conv);
-
-  gst_element_link_many (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink, NULL);
-  
-  
-  gst_element_link_filtered(mInternalGSTStruct.gst_conv, mInternalGSTStruct.gst_sink, caps);
-  // gst_element_link_many (mInternalGSTStruct.gst_play, mInternalGSTStruct.gst_sink, NULL);
-  g_object_set (mInternalGSTStruct.gst_play, "uri", filename, NULL);
-  // g_object_set (mInternalGSTStruct.gst_conv, "format", "RGB", NULL);
-  // g_object_set (mInternalGSTStruct.gst_conv, "caps", caps, NULL);
-
+  if(type == FROM_VIDEO_FILE)
+    g_object_set (mGstPlay, "uri", uri.c_str(), NULL);
+  else if(type == FROM_DEVICE)
+    g_object_set (mGstPlay, "device", uri.c_str(), NULL);
+  else if(type == FROM_RTSP)
+    g_object_set (mGstPlay, "location", uri.c_str(), NULL);
   /* Instruct the bus to emit signals for each received message, and connect to the interesting signals */
   GstBus *bus = gst_element_get_bus (mPipeline);
   gst_bus_add_signal_watch (bus);
-  g_signal_connect (G_OBJECT (bus), "message::error", (GCallback)error_cb, &mInternalGSTStruct);
-  g_signal_connect (G_OBJECT (bus), "message::eos", (GCallback)eos_cb, &mInternalGSTStruct);
-  g_signal_connect (G_OBJECT (bus), "message::state-changed", (GCallback)state_changed_cb, &mInternalGSTStruct);
+  g_signal_connect (G_OBJECT (bus), "message::error", (GCallback)error_cb, this);
+  g_signal_connect (G_OBJECT (bus), "message::eos", (GCallback)eos_cb, this);
+  g_signal_connect (G_OBJECT (bus), "message::state-changed", (GCallback)state_changed_cb, this);
   gst_object_unref (bus);
 
   /* Finally connect to the pad added event which will let us probe the images and convert to torch tensors */
-  g_signal_connect (mInternalGSTStruct.gst_play, "pad-added", G_CALLBACK (on_pad_added), mInternalGSTStruct.gst_conv);
-  // g_signal_connect (mInternalGSTStruct.gst_conv, "pad-added", G_CALLBACK (on_pad_added), mInternalGSTStruct.gst_sink);
-  GstPad  *pad = gst_element_get_static_pad(mInternalGSTStruct.gst_conv, "src");
-  if(pad != NULL) {
-    g_print("PAD RETREIVED\n");
+  g_signal_connect (mGstPlay, "pad-added", G_CALLBACK (on_pad_added), mGstConv);
+  GstPad  *pad = gst_element_get_static_pad(mGstConv, "src");
+  
+  if(pad != NULL)
     gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, (GstPadProbeCallback) cb_have_data, this, NULL);
-  } else {
-    g_print("PAD NOT RETREIVED\n");
-  }
+  else
+    g_printerr("PAD NOT RETREIVED\n");
+  
   /* Start playing */
   ret = gst_element_set_state (mPipeline, GST_STATE_PLAYING);
   if (ret == GST_STATE_CHANGE_FAILURE) {
@@ -305,85 +229,13 @@ bool DeviceReader::initializeGST() {
     return false;
   }
 
-  /* Register a function that GLib will call every second */
-  // g_timeout_add_seconds (1, (GSourceFunc)refresh_ui, &data);
-  // mGSTContext = g_main_loop_get_context (mGSTLoop);
-  // /* Start the GTK main loop. We will not regain control until gtk_main_quit is called. */
-  // g_print ("Running one iteration...\n");
-
-
-  // if(!g_main_context_iteration (mGSTContext, FALSE)) {
-  //   g_print("BROKEN\n");
-  // } else
-  //   g_print("Iterated\n");
-  // ret = gst_element_set_state (mInternalGSTStruct.gst_play, GST_STATE_PLAYING);
-
-  // sleep(1);
-  g_print("Now playing and main looping\n");
-
-  // for(int i =0 ;i < 2;i++) {
-  //   ret = gst_element_set_state (mPipeline, GST_STATE_PLAYING);
-    
-  //   if (ret == GST_STATE_CHANGE_FAILURE) {
-  //     g_printerr ("Unable to set the pipeline to the playing state.\n");
-  //     gst_object_unref (mInternalGSTStruct.gst_play);
-  //     return false;
-  //   }
-  // }
-
-  // g_main_loop_run (mGSTLoop);
-  // bool quit = false;
-  // while(!quit) {
-  //   if(!g_main_context_iteration (mGSTContext, FALSE)) {
-  //     g_print("BROKEN\n");
-  //     quit = true;
-  //   } else {
-  //     g_print("Iterated\n");
-  //   }
-  // }
-  // g_print("Shutting down\n");
-  // /* Free resources */
-  // shutdownGST();
-
   return true;
 }
-
 
 bool DeviceReader::isPlaying() {
   return mIsPlaying;
 }
 
-bool DeviceReader::waitForCompletion() {
-  while(!mInternalGSTStruct.should_quit) {
-    std::this_thread::sleep_for(1s);
-  }
-  return true;
-}
-
-void DeviceReader::setImageWidth(const uint32_t width) {
-  mImageWidth = width;
-}
-
-void DeviceReader::setImageHeight(const uint32_t height) {
-  mImageHeight = height;
-}
-
-uint32_t DeviceReader::getImageWidth() {
-  return mImageWidth;
-}
-
-uint32_t DeviceReader::getImageHeight() {
-  return mImageHeight;
-}
-
 void DeviceReader::pump(torch::Tensor &tensor) {
   mCallback(tensor);
-}
-
-void DeviceReader::iterate() {
-  if(!g_main_context_iteration (mGSTContext, FALSE)) {
-    g_print("BROKEN\n");
-  } else {
-    g_print("Iterated\n");
-  }
 }

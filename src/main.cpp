@@ -222,37 +222,32 @@ int main(int argc, char *argv[])
         // Prepare the raw image for inference
         torch::Tensor inference_img = torch::transpose(raw_image.clone(), 0, 2);
         inference_img = inference_img.unsqueeze(0);
+        
+        // Perform the inference
+        torch::Tensor saliency_map = perform_deep_gaze_inference(module, inference_img, centerbias);
+
+        // Transpose the raw image for viewing
+        raw_image = raw_image.clone();
+        raw_image = torch::transpose(raw_image, 0,1);
+
+#if (VIZ == 1)
+        // Show the raw image
+        ui.raw->setTensor(raw_image, VIZ_RGB);
+
+        // Show the saliency image
+        ui.saliency->setTensor(saliency_map, VIZ_HEATMAP);
+        std::this_thread::sleep_for(1s);
+        std::cout<< "Go\n";
+#endif
       }
-       break;    
+      break;    
     default:
       std::cerr << "Error: case not handled yet.\n";
   }
-
-  
-  
-
-  // // Perform the inference
-  // torch::Tensor saliency_map = perform_deep_gaze_inference(module, inference_img, centerbias);
-
-
  
-  // Transpose the raw image for viewing
-  // raw_image = raw_image.clone();
-  // raw_image = torch::transpose(raw_image, 0,1);
-
 #if (VIZ == 1)
-  // // Show the raw image
-  // ui.raw->setTensor(raw_image, VIZ_RGB);
-
-  // // Show the saliency image
-  // ui.saliency->setTensor(saliency_map, VIZ_HEATMAP);
-  // std::this_thread::sleep_for(1s);
-  // std::cout<< "Go\n";
-
-#endif
-#if (VIZ == 1)
-std::cout << "APP EXEC\n";
   return app.exec();
+#else
+  return 0;
 #endif
-  // return 0;
 }

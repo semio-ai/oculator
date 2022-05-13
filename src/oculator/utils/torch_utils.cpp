@@ -12,8 +12,11 @@ namespace torch_utils {
     }
 
     /**
-        Load the weights and model from a file.
-    */
+     *  Load the weights and model from a file.
+     *  
+     *  @param filename The file path for the file to load
+     *  @return The model that can be used for inference
+     */
     torch::jit::script::Module loadModel(const char * const filename) {
         torch::jit::script::Module module;
         try {

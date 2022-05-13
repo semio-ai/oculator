@@ -1,4 +1,17 @@
 #pragma once
+/**
+ *   ____  ____  _     _     ____  _____  ____  ____ 
+ *  /  _ \/   _\/ \ /\/ \   /  _ \/__ __\/  _ \/  __\
+ *  | / \||  /  | | ||| |   | / \|  / \  | / \||  \/|
+ *  | \_/||  \_ | \_/|| |_/\| |-||  | |  | \_/||    /
+ *  \____/\____/\____/\____/\_/ \|  \_/  \____/\_/\_\
+ * 
+ * Uses GStreamer to read streaming media like webcams, online video, and movie files.
+ * Streams to a torch tensor.
+ * 
+ * @author: ndepalma@alum.mit.edu
+ * @license: MIT License
+ */ 
 
 #include <gst/gst.h>
 #include <mutex>
@@ -8,55 +21,49 @@
 
 namespace oculator
 {
-
-  /* Structure to contain all our information, so we can pass it around */
-  typedef struct _DeviceReaderStruct {
-    GstElement *gst_play;           /* Our one and only pipeline */
-    GstElement *gst_conv;           /* Our one and only pipeline */
-    GstElement *gst_sink;           /* Our one and only pipeline */
-
-    GstState state;                 /* Current state of the pipeline */
-    uint32_t width, height;         /* Width and height of the video */
-    bool should_quit;
-  } DeviceReaderStruct;
-
+  typedef enum {
+    FROM_VIDEO_FILE,
+    FROM_DEVICE,
+    FROM_RTSP
+  } SourceType;
+  
   class DeviceReader
   {
+    friend GstPadProbeReturn cb_have_data (GstPad          *pad,
+                                           GstPadProbeInfo *info,
+                                           DeviceReader         *user_data);
+    friend void error_cb (GstBus *bus, GstMessage *msg, DeviceReader *data);
+    friend void state_changed_cb (GstBus *bus, GstMessage *msg, DeviceReader *data);
+    friend void eos_cb (GstBus *bus, GstMessage *msg, DeviceReader *data);
+
   public:
     DeviceReader(std::string uri, std::function< void(torch::Tensor) > callback);
     ~DeviceReader();
     
+    uint32_t mImageWidth, mImageHeight;
     bool isPlaying();
-    bool waitForCompletion();
-    void setImageWidth(const uint32_t width);
-    void setImageHeight(const uint32_t height);
 
-    uint32_t getImageWidth();
-    uint32_t getImageHeight();
-
-    friend GstPadProbeReturn cb_have_data (GstPad          *pad,
-                                                  GstPadProbeInfo *info,
-                                                  gpointer         user_data);
-    void pump(torch::Tensor &tensor);
-    void iterate();
-  private:
+  protected:
     bool mIsInitialized;
     bool mIsPlaying;
     bool mAreCapsKnown;
 
-    uint32_t mImageWidth, mImageHeight;
+    void pump(torch::Tensor &tensor);
 
     GMainLoop *mGSTLoop;
     GMainContext *mGSTContext;
+
     GstElement *mPipeline;
+    GstElement *mGstPlay;
+    GstElement *mGstConv; 
+    GstElement *mGstSink;
 
-    std::mutex mMutex;
-    DeviceReaderStruct mInternalGSTStruct;
+    GstState mState;
+    bool should_quit;
 
-    bool initializeGST();
+    bool initializeGST(const std::string uri, const SourceType type);
     void shutdownGST();
 
-    
-    std::function< void(torch::Tensor) > mCallback;
+    const std::function< void(torch::Tensor) > mCallback;
   };
 }
