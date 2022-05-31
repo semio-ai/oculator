@@ -58,19 +58,25 @@ namespace image_utils {
         depth = ilGetInteger(IL_IMAGE_DEPTH);
         size = ilGetInteger(IL_IMAGE_SIZE_OF_DATA);
 
-#ifdef _DEBUG
+// #ifdef _DEBUG
         std::cout << "File has width: " << width << std::endl;
         std::cout << "File has height: "  << height << std::endl;
         std::cout << "File has depth: " << depth << std::endl;
         std::cout << "Data size: " << size << std::endl;
-#endif
+// #endif
         // Create the torch tensor to return and fill it from OpenIL. 
         torch::Tensor imageData = torch::zeros({height,width,3}, torch::TensorOptions().dtype(torch::kUInt8));
-        std::memcpy(imageData.data_ptr(), data, width*height*3);
+        // std::memcpy(imageData.data_ptr(), data, width*height*3);
+        const uint32_t stride = size / height;
+      
+        std::cout << "Total size: " << size << " and stride: " << stride << std::endl;
+        for(int h = 0;h < height;h++)
+           std::memcpy(imageData[h].data_ptr(), data+(h*stride), width*3);
 
 #ifdef _DEBUG
         std::cout << "AFTER CPY" << std::endl;
 #endif
+        // torch::save(imageData, "tester.tch");
         // Cleanup
         ilDeleteImage(ImgId);
 

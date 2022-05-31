@@ -43,6 +43,7 @@ GstPadProbeReturn oculator::cb_have_data (GstPad *pad,
     gboolean res;
     res = gst_structure_get_int (s, "width", &width);
     res |= gst_structure_get_int (s, "height", &height);
+    const gchar *format_string = gst_structure_get_string(s, "format");
 
     if (!res)
       g_error( "no dimensions");
@@ -50,6 +51,7 @@ GstPadProbeReturn oculator::cb_have_data (GstPad *pad,
     reader->mImageWidth = width;
     reader->mImageHeight = height;
     g_print(" Width: %d, Height: %d\n", width, height);
+    g_print(" Format: %s\n", format_string);
     // g_print("Structure: %s\n", gst_structure_to_string(s));
     gst_caps_unref(caps);
   } else { // if(GST_EVENT_TYPE(event) == 1208042016)
@@ -73,10 +75,8 @@ GstPadProbeReturn oculator::cb_have_data (GstPad *pad,
       const uint32_t height = reader->mImageHeight;
       const uint32_t stride = total_size / height;
       torch::Tensor imageData = torch::zeros({height,width, 3}, torch::TensorOptions().dtype(torch::kUInt8));
-
       for(int h = 0;h < height;h++)
         std::memcpy(imageData[h].data_ptr(), array+(h*stride), width*3);
-
       free(array);
       reader->pump(imageData); 
     }
@@ -115,7 +115,6 @@ static void on_pad_added (GstElement *element,
 {
   GstPad *sinkpad;
   GstElement *vid_sink = (GstElement *) data;
-
   /* We can now link this pad with the vorbis-decoder sink pad */
   sinkpad = gst_element_get_static_pad (vid_sink, "sink");
 
@@ -137,6 +136,8 @@ void oculator::state_changed_cb (GstBus *bus, GstMessage *msg, DeviceReader *dat
 DeviceReader::DeviceReader(const std::string uri, 
                            const std::function< void(torch::Tensor) > callback) : 
                                       mCallback{callback} {
+  mIsInitialized = false;
+  mGstPlay = NULL;
   if(uri.rfind("file", 0) == 0)
     mIsInitialized = initializeGST(uri, FROM_VIDEO_FILE);
   else if(uri.rfind("/dev", 0) == 0)
@@ -146,7 +147,7 @@ DeviceReader::DeviceReader(const std::string uri,
 }
 
 void DeviceReader::shutdownGST() {
-  if(mGstPlay != NULL) {
+  if(mGstPlay != NULL && mIsInitialized) {
     gst_element_set_state (mGstPlay, GST_STATE_READY);
 
     gst_object_unref(mPipeline);
@@ -154,6 +155,7 @@ void DeviceReader::shutdownGST() {
     g_main_loop_unref(mGSTLoop);
     mGSTLoop = NULL;
     mGstPlay = NULL;
+    mIsInitialized = false;
   }
 }
 
@@ -178,11 +180,9 @@ bool DeviceReader::initializeGST(const std::string uri, const SourceType type) {
     mGstPlay = gst_element_factory_make ("uridecodebin", "uridecodebin");
   else if(type == FROM_DEVICE)
     mGstPlay = gst_element_factory_make ("autovideosrc", "autovideosrc");
-  else if(type == FROM_DEVICE)
-    mGstPlay = gst_element_factory_make ("rtspsrc", "rtspsrc");
   mGstConv = gst_element_factory_make ("videoconvert", "videoconvert");
-  // mGstSink = gst_element_factory_make ("autovideosink", "autovideosink");
-  mGstSink = gst_element_factory_make ("fakesink", "fakesink");
+  // mGstSink = gst_element_factory_make ("autovideosink", "autovideosink"); // for debugging
+  mGstSink = gst_element_factory_make ("fakesink", "fakesink"); // for release
   GstCaps * caps = gst_caps_new_simple ("video/x-raw",
                                         "format", G_TYPE_STRING, "RGB",
                                         NULL);
@@ -194,14 +194,14 @@ bool DeviceReader::initializeGST(const std::string uri, const SourceType type) {
   }
   
   gst_bin_add_many (GST_BIN (mPipeline), mGstPlay, mGstConv, mGstSink, NULL);
-  gst_element_link_many (mGstPlay, mGstConv, mGstSink, NULL);
-  
+
+  gst_element_link(mGstPlay, mGstConv);
   gst_element_link_filtered(mGstConv, mGstSink, caps);
   /* Set the URI to play */
   if(type == FROM_VIDEO_FILE)
     g_object_set (mGstPlay, "uri", uri.c_str(), NULL);
   else if(type == FROM_DEVICE)
-    g_object_set (mGstPlay, "device", uri.c_str(), NULL);
+    g_object_set (mGstPlay, "src", uri.c_str(), NULL);
   else if(type == FROM_RTSP)
     g_object_set (mGstPlay, "location", uri.c_str(), NULL);
   /* Instruct the bus to emit signals for each received message, and connect to the interesting signals */
