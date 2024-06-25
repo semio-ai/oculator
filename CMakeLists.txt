@@ -1,47 +1,26 @@
 cmake_minimum_required(VERSION 3.6)
-project(oculator)
+project(vin LANGUAGES CXX )
 
-if(NOT DEFINED ENV{CONDA_PREFIX})
-  message(FATAL_ERROR " Conda must be activated for this build to proceed.")
-  return()
-else()
-  set(_python_exe $ENV{CONDA_PREFIX}/bin/python)
-endif ()
+################################
+####### PREP FOR TORCH #########
+################################
 
-function(getsitepackages outvar)
-  set(_fixup_cmd "import sys;print(list(filter(lambda x: x.endswith('site-packages'), sys.path))[0])")
-  execute_process(
-    COMMAND "${_python_exe}" -c "${_fixup_cmd}"
-    RESULT_VARIABLE _getpath_exitcode
-    OUTPUT_VARIABLE _getpath_text)
-  if(NOT _getpath_exitcode EQUAL 0)
-    message(ERROR "Failed to get the cmake path for torch. Are you sure torch is installed for python?")
-    message(FATAL_ERROR " Python site-packages failed with error code: ${_getpath_exitcode}")
-  endif()
-  string(STRIP "${_getpath_text}" _path_stripped)
-  set(${outvar} "${_path_stripped}" PARENT_SCOPE)
-endfunction()
 
-getsitepackages(PYTHON_SITE_PACKAGES)
-set(_TORCH_CMAKE_DIR "${PYTHON_SITE_PACKAGES}/torch/share/cmake")
+# Now use the site packages to add some custom cmake directories
+set(CMAKE_PREFIX_PATH "${_CELLAR_CMAKE_DIRS}")
 
-if(DEFINED ENV{HOMEBREW_CELLAR})
-  message("Found homebrew")
-  set(_CELLAR_CMAKE_DIRS "$ENV{HOMEBREW_CELLAR}/qt@5/5.15.2_1/lib/cmake;$ENV{HOMEBREW_CELLAR}/devil/1.8.0_2/lib/pkgconfig")
-endif() 
-
-## Hacking the cmake paths for now. Need to figure out what to do about this later. 
-set(CMAKE_PREFIX_PATH "${_TORCH_CMAKE_DIR};${_CELLAR_CMAKE_DIRS}")
-# set(CMAKE_PREFIX_PATH "/opt/homebrew/Caskroom/miniforge/base/lib/python3.9/site-packages/torch/share/cmake;/opt/homebrew/Cellar/qt@5/5.15.2_1/lib/cmake;/opt/homebrew/Cellar/devil/1.8.0_2/lib/pkgconfig")
-
+#############################################
+####### Setting up compiler options #########
+#############################################
+#### bin2c for models during build
 include(FindPkgConfig REQUIRED)
+set (CMAKE_CXX_STANDARD 20)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
+include_directories("./include/" "/opt/homebrew/include/")
+add_compile_options("-stdlib=libc++")
 
 option (DEBUG "Build debug version" ON)
 option (RELEASE "Build release version" OFF)
-option (BUILD_VIZ "Build with GUI support" OFF)
-
-set (CMAKE_CXX_STANDARD 17)
-set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (DEBUG)
   add_definitions(-g -pg)
@@ -51,50 +30,118 @@ if (RELEASE)
   add_definitions(-Ofast)
 endif ()
 
+#############################################
+####### User centered build options #########
+#############################################
+option (BUILD_DEEPGAZE "Build Deepgaze support" ON)
+option (BUILD_OPENPOSE "Build OpenPose support" OFF)
+
+##########################################
+####### Find the needed packages #########
+##########################################
 find_package(PkgConfig REQUIRED)
-find_package(Torch REQUIRED)
+find_package(Catch2 REQUIRED)
+find_package(functional_dag REQUIRED)
+pkg_search_module(ONNX libonnxruntime)
+# find_package(libonnxruntime REQUIRED)
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FUNCTIONALDAG_CXX_FLAGS}")
 
-# find_package(cxxopts REQUIRED)
+# get_cmake_property(_variableNames VARIABLES)
+# list (SORT _variableNames)
+# foreach (_variableName ${_variableNames})
+#     message(STATUS "${_variableName}=${${_variableName}}")
+# endforeach()
+# file (GLOB_RECURSE SOURCES src/oculator/model/deepgaze_entry.cpp 
+#                            src/oculator/sink_tools/mcb_io.cpp 
+#                            src/oculator/utils/onnx_utils.cpp)
 
-pkg_check_modules(IL REQUIRED IMPORTED_TARGET IL)
-pkg_check_modules(ILU REQUIRED IMPORTED_TARGET ILU)
-pkg_check_modules(GST REQUIRED IMPORTED_TARGET gstreamer-1.0)
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ONNX_INCLUDE_DIRS}")
 
 
-if (BUILD_VIZ)
-  set(CMAKE_AUTOUIC ON)  
-  set(CMAKE_AUTOMOC ON)
-  set(CMAKE_AUTORCC ON)
-  
-  ADD_DEFINITIONS(-DQT_NO_KEYWORDS)
+if (BUILD_TESTING)
+  # message(${JSONCPP_INCLUDE_DIRS})
+  # add_executable(tests test/filter_sys/dag_tests.cpp test/filter_sys/lib_tests.cpp)
+  # target_include_directories(tests PRIVATE "include/" ${CATCH_INCLUDE_DIRS} ${TORCH_INCLUDE_DIRS})
+  # target_link_directories(tests PRIVATE ${CATCH_LIBRARY_DIRS} ${JSONCPP_LIBRARY_DIRS})
+  # target_link_libraries(tests filterdag ${CATCH_LIBRARIES} ${JSONCPP_LIBRARIES})
 
-  file (GLOB_RECURSE SOURCES src/*.cpp)
-  set (VIZ_CXX_FLAGS "-DVIZ=1")
+  # include(CTest)
+  # include(Catch)
+  # catch_discover_tests(tests)
+endif()
 
-  find_package(Qt5 COMPONENTS Widgets REQUIRED)
-else ()
-  set (VIZ_CXX_FLAGS "-DVIZ=0")
-  file (GLOB_RECURSE SOURCES src/oculator/*.cpp)
-endif () 
+add_custom_target(test_target ALL
+    # COMMAND echo "This is ALL target 'zoo', and it depends on ${TEST_FILE}"
+    COMMAND vin
+    # If the file exists, then commands related to that file won't be executed
+    # DONOT let other target depends on the same OUTPUT as current target,
+    #   or it may be bad when doing parallel make
+    # DEPENDS ${TEST_FILE}
 
-include_directories("include/")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS} ${IL2_CXX_FLAGS} ${VIZ_CXX_FLAGS}")
+    # to make quotes printable,for example
+    VERBATIM
+)
 
-include_directories("third_party/cxxopts")
-include_directories("/opt/homebrew/Cellar/libvlc-3.0.16-arm/64/include")
-link_directories("/opt/homebrew/Cellar/libvlc-3.0.16-arm/64/lib")
-# include_directories("/Applications/VLC.app/Contents/MacOS/include")
+##################################
+###### DeepGaze library  #########
+##################################
+if (BUILD_DEEPGAZE)
+  add_library(deepgaze SHARED src/oculator/utils/onnx_utils.cpp
+                              src/oculator/model/deepgaze_entry.cpp 
+                              src/oculator/sink_tools/mcb_io.cpp 
+                              )
+  target_include_directories(deepgaze PRIVATE "include/" ${ONNX_INCLUDE_DIRS})
+  target_compile_options(deepgaze PRIVATE -fPIC -fvisibility=hidden ${CMAKE_CXX_FLAGS})
+  target_link_directories(deepgaze PRIVATE ${ONNX_LIBRARY_DIRS})
+  target_link_libraries(deepgaze PRIVATE FunctionalDag::functional_dag ${ONNX_LIBRARIES})
 
-if (BUILD_VIZ)
-  file(GLOB HEADERS_TO_MOC include/oculator/viz/*.hpp)
-  qt5_wrap_cpp(PROCESSED_MOCS                                                                                                                                                                                                                                                                    
-                ${HEADERS_TO_MOC}                                                   
-                TARGET oculator
-                OPTIONS --no-notes) # Don't display a note for the headers which don't produce a moc_*.cpp
 
-  add_executable(oculator src/viz/mainwindow.ui ${SOURCES} ${PROCESSED_MOCS})
-  target_link_libraries(oculator PUBLIC ${TORCH_LIBRARIES} PkgConfig::IL PkgConfig::ILU Qt5::Core Qt5::Widgets PkgConfig::GST) 
-else ()
-  add_executable(oculator src/main.cpp ${SOURCES})
-  target_link_libraries(oculator PUBLIC ${TORCH_LIBRARIES} PkgConfig::IL PkgConfig::ILU vlc)
+  add_custom_command(
+          TARGET deepgaze POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E make_directory
+                  ${CMAKE_CURRENT_BINARY_DIR}/lib)
+
+  add_custom_command(
+          TARGET deepgaze POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy
+                  ${CMAKE_CURRENT_BINARY_DIR}/libdeepgaze.dylib
+                  ${CMAKE_CURRENT_BINARY_DIR}/lib/)
+
+  add_custom_command(
+          TARGET deepgaze POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E rm
+                  ${CMAKE_CURRENT_BINARY_DIR}/libdeepgaze.dylib)
+  set_property(
+          TARGET deepgaze APPEND
+          PROPERTY ADDITIONAL_CLEAN_FILES ${CMAKE_CURRENT_BINARY_DIR}/lib/libdeepgaze.dylib)
+endif ()
+
+
+if (BUILD_OPENPOSE)
+  add_library(openpose SHARED src/oculator/model/openpose_entry.cpp 
+                              src/oculator/utils/onnx_utils.cpp)
+  target_include_directories(openpose PRIVATE "include/" ${ONNX_INCLUDE_DIRS})
+  target_compile_options(openpose PRIVATE -fPIC -fvisibility=hidden ${CMAKE_CXX_FLAGS})
+  target_link_directories(openpose PRIVATE ${ONNX_LIBRARY_DIRS})
+  target_link_libraries(openpose PRIVATE FunctionalDag::functional_dag ${ONNX_LIBRARIES})
+
+
+  add_custom_command(
+          TARGET openpose POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E make_directory
+                  ${CMAKE_CURRENT_BINARY_DIR}/lib)
+
+  add_custom_command(
+          TARGET openpose POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy
+                  ${CMAKE_CURRENT_BINARY_DIR}/libopenpose.dylib
+                  ${CMAKE_CURRENT_BINARY_DIR}/lib/)
+
+  add_custom_command(
+          TARGET openpose POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E rm
+                  ${CMAKE_CURRENT_BINARY_DIR}/libopenpose.dylib)
+  set_property(
+          TARGET openpose APPEND
+          PROPERTY ADDITIONAL_CLEAN_FILES ${CMAKE_CURRENT_BINARY_DIR}/lib/libopenpose.dylib)
 endif ()
