@@ -2,12 +2,12 @@
 
 An implementation of oculesic (visual attention) behavior generation. This library is meant to incorporate a vision system as well as a gaze point selection pipeline. The architecture itself is meant to use few dependencies and incorporate a flexible design to allow for extensions. 
 
-## Dependencies
-  * Qt (For visualization)
-  * OpenIL (For image loading)
-  * Torch (For inference)
-  * GStreamer (For reading video files, RTSP, and webcam)
-
+## Build Dependencies
+  * [ONNX](https://onnxruntime.ai/) (For inference)
+  * [functional_dag](https://github.com/petrogly-ph/functional-dag/)
+  
+## Run Dependencies
+  * [vin](https://github.com/petrogly-ph/vin)
 ## Building
 
 ```bash
@@ -24,9 +24,8 @@ make -j4
 # in the oculator build directory
 
 # Start the salency example with the default camera and a resolution of 640x480
-./examples/saliency/saliency --device=0 --resolution_x=640 --resolution_y=480
+$ vin -c ../run/saliency.json
 ```
 
-
-# TODOs 
-QT has a framework for video reading. Use it?
+# Contributing
+Check the issue board if you'd like to hop on board! 
