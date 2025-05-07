@@ -1,0 +1,78 @@
+{
+  sources: [
+    {
+      target_id: {
+        bits1: 17214937618029235929,
+        bits2: 11873191836563383299
+      },
+      name: "image_in",
+      wires: [
+        {
+          key: "input_tensor",
+          value: ""
+        }
+      ],
+      options: [
+        {
+          name: "source_uri",
+          value: {
+            type: "STRING",
+            string_value: "/Users/drobotnik/projects/oculator/data/SampleVideo_640x360_2mb.mp4"
+          }
+        },
+        {
+          name: "width",
+          value: {
+            type: "INT",
+            int_value: 1024
+          }
+        },
+        {
+          name: "height",
+          value: {
+            type: "INT",
+            int_value: 768
+          }
+        }
+      ]
+    }
+  ],
+  nodes: [
+    {
+      target_id: {
+        bits1: 16859185142262743452,
+        bits2: 12206074125056773782
+      },
+      name: "deepgaze_node",
+      wires: [
+        {
+          key: "input_tensor",
+          value: "image_in"
+        }
+      ],
+      options: [
+        {
+          name: "model_filename",
+          value: {
+            type: "STRING",
+            string_value: "models/deepgaze.onnx"
+          }
+        },
+        {
+          name: "supporting_tensor",
+          value: {
+            type: "STRING",
+            string_value: "data/centerbias.arrow"
+          }
+        },
+        {
+          name: "tensor_param_name",
+          value: {
+            type: "STRING",
+            string_value: "onnx::Reshape_1"
+          }
+        }
+      ]
+    }
+  ]
+}

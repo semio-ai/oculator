@@ -1,0 +1,56 @@
+{
+  sources: [
+    {
+      target_id: {
+        bits1: 17214937618029235929,
+        bits2: 11873191836563383299
+      },
+      name: "video_source",
+      wires: [
+        {
+          key: "input_tensor",
+          value: ""
+        }
+      ],
+      options: [
+        {
+          name: "source_uri",
+          value: {
+            type: "STRING",
+            string_value: "/Users/drobotnik/projects/oculator/data/SampleVideo_640x360_2mb.mp4"
+          }
+        },
+        {
+          name: "width",
+          value: {
+            type: "INT"
+          }
+        },
+        {
+          name: "height",
+          value: {
+            type: "INT"
+          }
+        }
+      ]
+    }
+  ],
+  nodes: [
+    {
+      target_id: {
+        bits1: 5990589025803321351,
+        bits2: 10956163709085051015
+      },
+      name: "image_viewer",
+      wires: [
+        {
+          key: "input_tensor",
+          value: "video_source"
+        }
+      ],
+      options: [
+
+      ]
+    }
+  ]
+}
